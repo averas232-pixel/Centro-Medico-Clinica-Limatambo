@@ -1,0 +1,13 @@
+﻿using System;
+using System.Collections.Generic;
+using CentroMedico.Domain.Entities;
+
+namespace CentroMedico.Domain.Interfaces
+{
+    public interface ICitaRepository
+    {
+        Cita ObtenerPorId(int id);
+        List<Cita> ObtenerAgendaDelDia(DateTime fecha);
+        int Registrar(Cita cita);
+    }
+}

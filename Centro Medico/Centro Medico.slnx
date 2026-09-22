@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Centro Medico UI/Centro_Medico UI.csproj" />
+  <Project Path="CentroMedico.Application/CentroMedico.Application.csproj" />
+  <Project Path="CentroMedico.Domain/CentroMedico.Domain.csproj" />
+  <Project Path="CentroMedico.Infrastructure/CentroMedico.Infrastructure.csproj" />
+</Solution>
