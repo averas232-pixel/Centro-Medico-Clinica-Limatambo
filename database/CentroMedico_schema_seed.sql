@@ -1,8 +1,8 @@
 /* ============================================================
-   Sistema Transaccional - Clínica Limatambo Cajamarca (referencial)
-   Curso: Desarrollo de Software con C#, ADO.NET y WPF
-   Motor: SQL Server 2019+
-   Nota: nombre de la clínica es referencial, cámbialo si usas otro.
+   Sistema Transaccional - Clínica Limatambo Cajamarca 
+   v2: + auditoría (FechaCreacion/Activo), + kardex de insumos
+       (MovimientosInsumo), Facturas.CitaID ya no es UNIQUE,
+       + procedimiento de impresión ASCII de boleta.
    ============================================================ */
 
 IF DB_ID('CentroMedicoDB') IS NULL
@@ -33,6 +33,8 @@ CREATE TABLE Medicos (
     Telefono VARCHAR(9) NOT NULL,
     Email VARCHAR(100) NOT NULL,
     FechaIngreso DATE NOT NULL,
+    FechaCreacion DATETIME NOT NULL DEFAULT GETDATE(),
+    Activo BIT NOT NULL DEFAULT 1,
     CONSTRAINT FK_Medicos_Especialidad FOREIGN KEY (EspecialidadID) REFERENCES Especialidades(EspecialidadID)
 );
 GO
@@ -46,7 +48,9 @@ CREATE TABLE Pacientes (
     Sexo CHAR(1) NOT NULL CHECK (Sexo IN ('M','F')),
     Telefono VARCHAR(9) NOT NULL,
     Direccion VARCHAR(150) NOT NULL,
-    Email VARCHAR(100) NULL
+    Email VARCHAR(100) NULL,
+    FechaCreacion DATETIME NOT NULL DEFAULT GETDATE(),
+    Activo BIT NOT NULL DEFAULT 1
 );
 GO
 
@@ -78,7 +82,9 @@ CREATE TABLE Insumos (
     Descripcion VARCHAR(200) NULL,
     Stock INT NOT NULL CHECK (Stock >= 0),
     PrecioUnitario DECIMAL(10,2) NOT NULL,
-    UnidadMedida VARCHAR(20) NOT NULL
+    UnidadMedida VARCHAR(20) NOT NULL,
+    FechaCreacion DATETIME NOT NULL DEFAULT GETDATE(),
+    Activo BIT NOT NULL DEFAULT 1
 );
 GO
 
@@ -102,9 +108,26 @@ CREATE TABLE DetalleReceta (
 );
 GO
 
+-- Kardex: cada descuento/ingreso de stock queda trazado (pedido explícito:
+-- trazabilidad del descuento de insumos en la transacción crítica)
+CREATE TABLE MovimientosInsumo (
+    MovimientoID INT IDENTITY(1,1) PRIMARY KEY,
+    InsumoID INT NOT NULL,
+    TipoMovimiento VARCHAR(10) NOT NULL CHECK (TipoMovimiento IN ('Entrada','Salida')),
+    Cantidad INT NOT NULL CHECK (Cantidad > 0),
+    StockAnterior INT NOT NULL,
+    StockNuevo INT NOT NULL,
+    Motivo VARCHAR(150) NOT NULL,
+    ReferenciaDetalleRecetaID INT NULL,
+    FechaMovimiento DATETIME NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT FK_Movimientos_Insumo FOREIGN KEY (InsumoID) REFERENCES Insumos(InsumoID),
+    CONSTRAINT FK_Movimientos_DetalleReceta FOREIGN KEY (ReferenciaDetalleRecetaID) REFERENCES DetalleReceta(DetalleRecetaID)
+);
+GO
+
 CREATE TABLE Facturas (
     FacturaID INT IDENTITY(1,1) PRIMARY KEY,
-    CitaID INT NOT NULL UNIQUE,
+    CitaID INT NOT NULL,  -- ya no es UNIQUE: permite reemisión / notas de crédito a futuro
     Serie CHAR(4) NOT NULL,
     Correlativo VARCHAR(8) NOT NULL,
     FechaEmision DATETIME NOT NULL,
@@ -113,7 +136,8 @@ CREATE TABLE Facturas (
     Total DECIMAL(10,2) NOT NULL,
     MetodoPago VARCHAR(20) NOT NULL CHECK (MetodoPago IN ('Efectivo','Tarjeta','Yape/Plin','Transferencia')),
     Estado VARCHAR(20) NOT NULL DEFAULT 'Pagada' CHECK (Estado IN ('Pagada','Anulada')),
-    CONSTRAINT FK_Facturas_Cita FOREIGN KEY (CitaID) REFERENCES Citas(CitaID)
+    CONSTRAINT FK_Facturas_Cita FOREIGN KEY (CitaID) REFERENCES Citas(CitaID),
+    CONSTRAINT UQ_Facturas_Serie_Correlativo UNIQUE (Serie, Correlativo)
 );
 GO
 
@@ -167,105 +191,105 @@ INSERT INTO Especialidades (Nombre) VALUES
 GO
 
 -- 2.2 Medicos (30)
-INSERT INTO Medicos (CMP, Nombres, Apellidos, EspecialidadID, Telefono, Email, FechaIngreso) VALUES
-('39256', 'Carlos Gustavo', 'Marín Guevara', 5, '918196001', 'carlos.marín0@centromedico.pe', '2018-04-17'),
-('38893', 'Edgar Manuel', 'Ocas Bringas', 15, '994026542', 'edgar.ocas1@centromedico.pe', '2018-06-04'),
-('89131', 'Víctor Miguel', 'Salazar Salazar', 9, '907816184', 'víctor.salazar2@centromedico.pe', '2025-10-28'),
-('39871', 'Isabel Elena', 'Cueva Chávez', 25, '941316475', 'isabel.cueva3@centromedico.pe', '2017-06-12'),
-('80010', 'Marco Ricardo', 'Cueva Bardales', 24, '932764835', 'marco.cueva4@centromedico.pe', '2015-04-27'),
-('18675', 'César Raúl', 'Chilón Marín', 7, '995376724', 'césar.chilón5@centromedico.pe', '2017-04-24'),
-('57447', 'Lucía Isabel', 'Horna Chilón', 8, '928710122', 'lucía.horna6@centromedico.pe', '2025-07-20'),
-('42953', 'Víctor Víctor', 'León Plasencia', 18, '901845146', 'víctor.león7@centromedico.pe', '2017-08-01'),
-('23947', 'Beatriz Deysi', 'Alcántara Rimarachín', 28, '948932528', 'beatriz.alcántara8@centromedico.pe', '2023-01-20'),
-('50306', 'Mercedes María', 'Mendoza Bazán', 8, '903911718', 'mercedes.mendoza9@centromedico.pe', '2017-03-22'),
-('89507', 'Cecilia Luz', 'Silva Plasencia', 14, '938346578', 'cecilia.silva10@centromedico.pe', '2022-02-08'),
-('40161', 'José Raúl', 'Sánchez Yopla', 19, '930103105', 'josé.sánchez11@centromedico.pe', '2016-09-08'),
-('27342', 'Karina Mercedes', 'Quispe Ocas', 24, '999737631', 'karina.quispe12@centromedico.pe', '2016-11-14'),
-('22899', 'Doris Doris', 'León Cabanillas', 2, '965133387', 'doris.león13@centromedico.pe', '2017-07-06'),
-('82132', 'Nélida Patricia', 'Cueva Saldaña', 4, '908013267', 'nélida.cueva14@centromedico.pe', '2022-04-28'),
-('10282', 'Judith Rosa', 'Bardales Malca', 13, '947468723', 'judith.bardales15@centromedico.pe', '2019-04-02'),
-('86569', 'Gustavo Raúl', 'Cabanillas Cabanillas', 16, '988208121', 'gustavo.cabanillas16@centromedico.pe', '2024-02-22'),
-('20745', 'Víctor Miguel', 'Guevara Chávez', 14, '999854353', 'víctor.guevara17@centromedico.pe', '2019-07-05'),
-('70068', 'Nélida Flor', 'Cueva Vera', 20, '991183842', 'nélida.cueva18@centromedico.pe', '2020-02-08'),
-('49651', 'Gladys Luz', 'Saldaña Ocas', 20, '980841241', 'gladys.saldaña19@centromedico.pe', '2016-12-18'),
-('36685', 'Ricardo Alberto', 'Quispe Villanueva', 22, '948740164', 'ricardo.quispe20@centromedico.pe', '2015-01-11'),
-('82309', 'Hugo Ricardo', 'Bardales Saldaña', 23, '968011280', 'hugo.bardales21@centromedico.pe', '2020-10-18'),
-('57795', 'Eduardo Jorge', 'Chávez Tello', 29, '905331586', 'eduardo.chávez22@centromedico.pe', '2024-12-05'),
-('13248', 'Walter Pedro', 'Alcántara Bringas', 6, '956342160', 'walter.alcántara23@centromedico.pe', '2022-04-07'),
-('13101', 'Yolanda Gladys', 'Díaz Díaz', 22, '936541458', 'yolanda.díaz24@centromedico.pe', '2021-11-27'),
-('86099', 'María Ana', 'Silva Alcántara', 9, '901965569', 'maría.silva25@centromedico.pe', '2023-02-13'),
-('78146', 'Ricardo Luis', 'Horna Vera', 30, '983561595', 'ricardo.horna26@centromedico.pe', '2025-02-24'),
-('62743', 'Beatriz Gladys', 'Bringas Benavides', 23, '948236629', 'beatriz.bringas27@centromedico.pe', '2024-05-13'),
-('86019', 'Alberto Alberto', 'Quispe Horna', 20, '957773872', 'alberto.quispe28@centromedico.pe', '2025-02-10'),
-('39444', 'Carmen Consuelo', 'Guevara Tello', 26, '932003791', 'carmen.guevara29@centromedico.pe', '2022-07-21');
+INSERT INTO Medicos (CMP, Nombres, Apellidos, EspecialidadID, Telefono, Email, FechaIngreso, FechaCreacion, Activo) VALUES
+('39256', 'Carlos Gustavo', 'Marín Guevara', 5, '918196001', 'carlos.marín0@centromedico.pe', '2018-04-17', DATEADD(DAY, -57, GETDATE()), 1),
+('38893', 'Iván Hugo', 'Ocas Bringas', 15, '994026542', 'iván.ocas1@centromedico.pe', '2018-06-04', DATEADD(DAY, -124, GETDATE()), 1),
+('15695', 'Ana Yolanda', 'Salazar Silva', 24, '978161849', 'ana.salazar2@centromedico.pe', '2020-10-07', DATEADD(DAY, -101, GETDATE()), 1),
+('40512', 'Marco Fernando', 'Cotrina Vásquez', 28, '916475255', 'marco.cotrina3@centromedico.pe', '2018-11-09', DATEADD(DAY, -103, GETDATE()), 1),
+('70589', 'Edgar Gustavo', 'Guevara Bardales', 13, '948350305', 'edgar.guevara4@centromedico.pe', '2021-05-03', DATEADD(DAY, -246, GETDATE()), 1),
+('70142', 'Elena Norma', 'Rabanal Chilón', 5, '942388496', 'elena.rabanal5@centromedico.pe', '2024-07-12', DATEADD(DAY, -254, GETDATE()), 1),
+('24371', 'Wilson Segundo', 'Vásquez Cabanillas', 5, '926916697', 'wilson.vásquez6@centromedico.pe', '2023-05-18', DATEADD(DAY, -41, GETDATE()), 1),
+('54587', 'Marco Julio', 'Ocas Marín', 4, '946270482', 'marco.ocas7@centromedico.pe', '2023-02-28', DATEADD(DAY, -335, GETDATE()), 1),
+('79514', 'Jorge Jaime', 'Bardales Ocas', 30, '909570154', 'jorge.bardales8@centromedico.pe', '2018-01-08', DATEADD(DAY, -110, GETDATE()), 1),
+('26483', 'Gustavo Segundo', 'Cueva Ocas', 5, '978248963', 'gustavo.cueva9@centromedico.pe', '2023-12-23', DATEADD(DAY, -235, GETDATE()), 1),
+('77839', 'Susana Karina', 'Bazán Saldaña', 15, '913315098', 'susana.bazán10@centromedico.pe', '2018-10-08', DATEADD(DAY, -37, GETDATE()), 1),
+('18834', 'Iván Hugo', 'Cabanillas Díaz', 29, '905183473', 'iván.cabanillas11@centromedico.pe', '2023-03-24', DATEADD(DAY, -514, GETDATE()), 1),
+('22363', 'César Segundo', 'Bringas Zorrilla', 4, '965667010', 'césar.bringas12@centromedico.pe', '2021-12-11', DATEADD(DAY, -141, GETDATE()), 1),
+('28373', 'Manuel Manuel', 'Ocas Saldaña', 14, '924731781', 'manuel.ocas13@centromedico.pe', '2015-11-18', DATEADD(DAY, -45, GETDATE()), 1),
+('63269', 'Oscar Rubén', 'Guevara Bardales', 16, '973602606', 'oscar.guevara14@centromedico.pe', '2019-08-10', DATEADD(DAY, -463, GETDATE()), 1),
+('17665', 'Juana Elena', 'Cotrina Quispe', 19, '980500978', 'juana.cotrina15@centromedico.pe', '2023-03-02', DATEADD(DAY, -550, GETDATE()), 1),
+('40828', 'Walter Pedro', 'Cueva Cueva', 13, '919399091', 'walter.cueva16@centromedico.pe', '2021-11-19', DATEADD(DAY, -565, GETDATE()), 1),
+('41285', 'Vilma Silvia', 'Quispe Benavides', 9, '962475107', 'vilma.quispe17@centromedico.pe', '2024-10-04', DATEADD(DAY, -105, GETDATE()), 1),
+('19016', 'Wilson Ricardo', 'Huamán Salazar', 29, '935427849', 'wilson.huamán18@centromedico.pe', '2025-09-01', DATEADD(DAY, -597, GETDATE()), 1),
+('44664', 'Vilma Karina', 'Rojas Huamán', 4, '918244935', 'vilma.rojas19@centromedico.pe', '2018-11-21', DATEADD(DAY, -300, GETDATE()), 1),
+('65518', 'Silvia Judith', 'Cabanillas Vásquez', 27, '940052427', 'silvia.cabanillas20@centromedico.pe', '2023-12-14', DATEADD(DAY, -39, GETDATE()), 1),
+('14722', 'José Julio', 'Terán Ocas', 27, '959826204', 'josé.terán21@centromedico.pe', '2020-01-12', DATEADD(DAY, -245, GETDATE()), 1),
+('63264', 'Marco Miguel', 'Salazar Yopla', 20, '923226025', 'marco.salazar22@centromedico.pe', '2021-11-28', DATEADD(DAY, -284, GETDATE()), 1),
+('15075', 'Luz Edith', 'Rojas Malca', 28, '973375433', 'luz.rojas23@centromedico.pe', '2015-11-07', DATEADD(DAY, -438, GETDATE()), 1),
+('56025', 'Silvia Marisol', 'Cueva Marín', 21, '986850142', 'silvia.cueva24@centromedico.pe', '2024-05-02', DATEADD(DAY, -141, GETDATE()), 1),
+('89457', 'Yolanda Lucía', 'Benavides Horna', 17, '916934060', 'yolanda.benavides25@centromedico.pe', '2023-09-22', DATEADD(DAY, -231, GETDATE()), 1),
+('26334', 'Doris Carmen', 'Villanueva Benavides', 24, '948465648', 'doris.villanueva26@centromedico.pe', '2017-04-14', DATEADD(DAY, -418, GETDATE()), 1),
+('81819', 'Rolando Elmer', 'Tello Chilón', 27, '904436995', 'rolando.tello27@centromedico.pe', '2022-08-15', DATEADD(DAY, -248, GETDATE()), 1),
+('47196', 'Edith Judith', 'Bardales Vásquez', 17, '995134332', 'edith.bardales28@centromedico.pe', '2015-01-08', DATEADD(DAY, -516, GETDATE()), 1),
+('74799', 'Mario Eduardo', 'Zorrilla Malca', 13, '932016328', 'mario.zorrilla29@centromedico.pe', '2022-01-18', DATEADD(DAY, -285, GETDATE()), 0);
 GO
 
 -- 2.3 Pacientes (30)
-INSERT INTO Pacientes (DNI, Nombres, Apellidos, FechaNacimiento, Sexo, Telefono, Direccion, Email) VALUES
-('63640499', 'Iván Iván', 'Malca Rabanal', '1965-03-21', 'M', '901632870', 'Jr. Junín 355, Cajamarca', 'iván0@gmail.com'),
-('52587010', 'Mario Jorge', 'León Plasencia', '1998-08-20', 'M', '986872774', 'Jr. Del Comercio 960, Cajamarca', 'mario1@gmail.com'),
-('42111036', 'Deysi Deysi', 'Plasencia Rabanal', '1967-08-03', 'F', '943455812', 'Av. Hoyos Rubio 336, Cajamarca', 'deysi2@gmail.com'),
-('65682626', 'Milagros Juana', 'Quispe Cueva', '1976-06-18', 'F', '976036690', 'Psje. Los Pinos 489, Cajamarca', 'milagros3@gmail.com'),
-('66240084', 'María Yolanda', 'Tello Malca', '1984-12-24', 'F', '989373467', 'Jr. Amazonas 498, Cajamarca', 'maría4@gmail.com'),
-('72732043', 'Karina Karina', 'Chilón Bardales', '1958-10-18', 'F', '906990162', 'Av. Independencia 286, Cajamarca', 'karina5@gmail.com'),
-('71028710', 'Ricardo Víctor', 'Benavides Quispe', '1970-06-25', 'M', '964641708', 'Jr. Amazonas 458, Cajamarca', 'ricardo6@gmail.com'),
-('43189803', 'Hugo José', 'Chávez Sánchez', '1962-01-20', 'M', '923271937', 'Av. Atahualpa 885, Cajamarca', 'hugo7@gmail.com'),
-('51746937', 'Luz Teresa', 'Mendoza Bardales', '1956-10-01', 'F', '949663193', 'Jr. Cruz de Piedra 813, Cajamarca', 'luz8@gmail.com'),
-('56600900', 'Marisol Karina', 'Mendoza Chávez', '1984-07-22', 'F', '951850671', 'Jr. San Martín 470, Cajamarca', 'marisol9@gmail.com'),
-('46249845', 'Milagros Juana', 'Horna Alcántara', '1989-09-25', 'F', '977694531', 'Av. Atahualpa 561, Cajamarca', 'milagros10@gmail.com'),
-('13852048', 'Rubén Mario', 'Malca Villanueva', '1981-06-06', 'M', '973545494', 'Jr. Junín 110, Cajamarca', 'rubén11@gmail.com'),
-('42255732', 'José Fernando', 'Bringas Rabanal', '1994-08-21', 'M', '977014363', 'Av. Atahualpa 779, Cajamarca', 'josé12@gmail.com'),
-('67110154', 'Mercedes Cecilia', 'Plasencia Salazar', '1997-09-11', 'F', '957444313', 'Jr. Apurímac 222, Cajamarca', 'mercedes13@gmail.com'),
-('47983442', 'Manuel Manuel', 'Cabrera Marín', '1956-04-10', 'M', '935240824', 'Jr. Amazonas 155, Cajamarca', 'manuel14@gmail.com'),
-('11646234', 'Milagros Juana', 'Rabanal Rojas', '1986-05-16', 'F', '977520471', 'Jr. Cruz de Piedra 510, Cajamarca', 'milagros15@gmail.com'),
-('30024960', 'Carmen Isabel', 'Cabanillas Terán', '1986-05-03', 'F', '931869993', 'Jr. Junín 489, Cajamarca', 'carmen16@gmail.com'),
-('50987442', 'Vilma Nélida', 'Tello Horna', '1986-10-02', 'F', '991334123', 'Av. Hoyos Rubio 665, Cajamarca', 'vilma17@gmail.com'),
-('73070585', 'Pedro Carlos', 'Bringas Saldaña', '1968-01-08', 'M', '944713493', 'Jr. San Martín 217, Cajamarca', 'pedro18@gmail.com'),
-('19584466', 'Hugo Jorge', 'Marín Terán', '1953-03-26', 'M', '949947174', 'Jr. San Martín 378, Cajamarca', 'hugo19@gmail.com'),
-('53261270', 'Nélida Carmen', 'Chávez Horna', '1988-05-01', 'F', '913990490', 'Av. Hoyos Rubio 581, Cajamarca', 'nélida20@gmail.com'),
-('75998319', 'Vilma Silvia', 'Alcántara Horna', '1955-08-12', 'F', '965512567', 'Av. Atahualpa 778, Cajamarca', 'vilma21@gmail.com'),
-('71045700', 'Consuelo Deysi', 'Yopla Chávez', '1955-06-09', 'F', '951680876', 'Jr. Amazonas 292, Cajamarca', 'consuelo22@gmail.com'),
-('16927215', 'Teresa Deysi', 'Rabanal Saldaña', '1963-05-18', 'F', '924771093', 'Av. Hoyos Rubio 418, Cajamarca', 'teresa23@gmail.com'),
-('25228493', 'Edgar Eduardo', 'Vásquez Díaz', '1979-02-21', 'M', '927484677', 'Jr. Del Comercio 567, Cajamarca', 'edgar24@gmail.com'),
-('19369750', 'Víctor Manuel', 'Rimarachín Huamán', '1967-07-11', 'M', '984044997', 'Av. Hoyos Rubio 557, Cajamarca', 'víctor25@gmail.com'),
-('60628276', 'Yolanda Flor', 'Yopla Ocas', '1979-06-28', 'F', '933963605', 'Av. Independencia 822, Cajamarca', 'yolanda26@gmail.com'),
-('14968688', 'Susana Karina', 'Terán Rabanal', '1958-09-19', 'F', '951718702', 'Jr. San Martín 991, Cajamarca', 'susana27@gmail.com'),
-('63349308', 'José Segundo', 'Silva Villanueva', '1991-02-28', 'M', '958657809', 'Jr. Cruz de Piedra 340, Cajamarca', 'josé28@gmail.com'),
-('23212812', 'Patricia Lucía', 'Vásquez Horna', '1998-11-23', 'F', '917240050', 'Av. Atahualpa 467, Cajamarca', 'patricia29@gmail.com');
+INSERT INTO Pacientes (DNI, Nombres, Apellidos, FechaNacimiento, Sexo, Telefono, Direccion, Email, FechaCreacion, Activo) VALUES
+('52587010', 'Mario Jorge', 'León Plasencia', '1998-08-20', 'M', '986872774', 'Jr. Del Comercio 960, Cajamarca', 'mario0@gmail.com', DATEADD(DAY, -313, GETDATE()), 1),
+('20399639', 'Norma Patricia', 'Marín Saldaña', '1995-05-08', 'F', '945581223', 'Jr. San Martín 810, Cajamarca', 'norma1@gmail.com', DATEADD(DAY, -186, GETDATE()), 1),
+('72535301', 'José Eduardo', 'Bringas Villanueva', '1976-01-07', 'M', '966909670', 'Jr. Apurímac 405, Cajamarca', 'josé2@gmail.com', DATEADD(DAY, -429, GETDATE()), 1),
+('75529051', 'Cecilia Lucía', 'Ocas Díaz', '1964-05-14', 'F', '970656272', 'Psje. Los Pinos 646, Cajamarca', 'cecilia3@gmail.com', DATEADD(DAY, -57, GETDATE()), 1),
+('67527432', 'Isabel Isabel', 'Sánchez Vásquez', '1958-08-06', 'F', '904653755', 'Jr. San Martín 384, Cajamarca', 'isabel4@gmail.com', DATEADD(DAY, -461, GETDATE()), 1),
+('16990811', 'Consuelo Carmen', 'Cabrera Sánchez', '1972-04-21', 'F', '910033092', 'Jr. Del Comercio 229, Cajamarca', 'consuelo5@gmail.com', DATEADD(DAY, -514, GETDATE()), 1),
+('59512272', 'Elmer Manuel', 'León Silva', '1960-10-20', 'M', '912419049', 'Jr. San Martín 506, Cajamarca', 'elmer6@gmail.com', DATEADD(DAY, -233, GETDATE()), 1),
+('50477742', 'Elmer Iván', 'Guevara Rojas', '1993-10-26', 'M', '919058651', 'Jr. Junín 763, Cajamarca', 'elmer7@gmail.com', DATEADD(DAY, -379, GETDATE()), 1),
+('68186525', 'Walter Eduardo', 'Rabanal Rojas', '1973-11-27', 'M', '972628498', 'Av. Independencia 576, Cajamarca', 'walter8@gmail.com', DATEADD(DAY, -476, GETDATE()), 1),
+('47437115', 'Flor Marisol', 'Guevara Vásquez', '1978-04-25', 'F', '979965075', 'Av. Hoyos Rubio 599, Cajamarca', 'flor9@gmail.com', DATEADD(DAY, -247, GETDATE()), 1),
+('47080140', 'Edith Silvia', 'Villanueva Marín', '1985-01-17', 'F', '931367837', 'Av. Independencia 558, Cajamarca', 'edith10@gmail.com', DATEADD(DAY, -47, GETDATE()), 1),
+('51098277', 'Alberto Fernando', 'Chilón Guevara', '1992-10-12', 'M', '978856855', 'Av. Independencia 377, Cajamarca', 'alberto11@gmail.com', DATEADD(DAY, -343, GETDATE()), 1),
+('26046365', 'Patricia Ana', 'Zorrilla Benavides', '1997-09-25', 'F', '923374989', 'Av. Atahualpa 202, Cajamarca', 'patricia12@gmail.com', DATEADD(DAY, -228, GETDATE()), 1),
+('11898961', 'Patricia Yolanda', 'Alcántara Tello', '1995-09-05', 'F', '940084271', 'Jr. Amazonas 687, Cajamarca', 'patricia13@gmail.com', DATEADD(DAY, -321, GETDATE()), 1),
+('16895666', 'Mercedes Nélida', 'Villanueva Alcántara', '1966-08-04', 'F', '916719022', 'Psje. Los Pinos 411, Cajamarca', 'mercedes14@gmail.com', DATEADD(DAY, -117, GETDATE()), 1),
+('61053474', 'Miguel Edgar', 'Bringas Díaz', '1978-08-10', 'M', '996499091', 'Jr. Del Comercio 740, Cajamarca', 'miguel15@gmail.com', DATEADD(DAY, -246, GETDATE()), 1),
+('33328859', 'Karina Carmen', 'Bardales Guevara', '1985-02-06', 'F', '906797403', 'Av. Atahualpa 823, Cajamarca', 'karina16@gmail.com', DATEADD(DAY, -319, GETDATE()), 1),
+('36550845', 'Carmen Karina', 'Díaz Silva', '1977-02-18', 'F', '932421024', 'Psje. Los Pinos 866, Cajamarca', 'carmen17@gmail.com', DATEADD(DAY, -325, GETDATE()), 1),
+('46540265', 'Ana Nélida', 'Tello Chilón', '1982-09-16', 'F', '971906594', 'Jr. Amazonas 193, Cajamarca', 'ana18@gmail.com', DATEADD(DAY, -264, GETDATE()), 1),
+('33513701', 'Rubén Marco', 'Marín Chávez', '1980-09-21', 'M', '974296717', 'Jr. Apurímac 518, Cajamarca', 'rubén19@gmail.com', DATEADD(DAY, -371, GETDATE()), 1),
+('65250068', 'Karina Ana', 'Bardales Villanueva', '1994-08-10', 'F', '968071545', 'Jr. Cruz de Piedra 891, Cajamarca', 'karina20@gmail.com', DATEADD(DAY, -443, GETDATE()), 1),
+('65465150', 'Marco Walter', 'Ocas León', '1953-04-17', 'M', '959770348', 'Av. Hoyos Rubio 394, Cajamarca', 'marco21@gmail.com', DATEADD(DAY, -478, GETDATE()), 1),
+('51708177', 'Ana María', 'Guevara Bardales', '1985-01-18', 'F', '961317127', 'Av. Atahualpa 621, Cajamarca', 'ana22@gmail.com', DATEADD(DAY, -309, GETDATE()), 1),
+('71308842', 'Consuelo Mercedes', 'Cabrera Guevara', '1985-03-13', 'F', '939821465', 'Jr. Junín 373, Cajamarca', 'consuelo23@gmail.com', DATEADD(DAY, -32, GETDATE()), 1),
+('69934576', 'Lucía Gladys', 'Rabanal Terán', '1984-08-12', 'F', '958867533', 'Psje. Los Pinos 492, Cajamarca', 'lucía24@gmail.com', DATEADD(DAY, -269, GETDATE()), 1),
+('61818612', 'Rosa Flor', 'Cabrera Malca', '1992-11-05', 'F', '970289517', 'Jr. Cruz de Piedra 638, Cajamarca', 'rosa25@gmail.com', DATEADD(DAY, -497, GETDATE()), 1),
+('20043277', 'Gustavo Jorge', 'Bringas Terán', '1980-05-11', 'M', '996158657', 'Jr. Junín 136, Cajamarca', 'gustavo26@gmail.com', DATEADD(DAY, -100, GETDATE()), 1),
+('22130508', 'Hugo Marco', 'Cotrina Díaz', '1977-02-25', 'M', '917240050', 'Av. Atahualpa 467, Cajamarca', 'hugo27@gmail.com', DATEADD(DAY, -413, GETDATE()), 1),
+('34166826', 'Juana Patricia', 'Plasencia Bringas', '1960-03-03', 'F', '996937923', 'Av. Independencia 753, Cajamarca', 'juana28@gmail.com', DATEADD(DAY, -290, GETDATE()), 1),
+('48605268', 'Silvia Karina', 'Vera León', '1993-09-06', 'F', '917594647', 'Av. Atahualpa 303, Cajamarca', 'silvia29@gmail.com', DATEADD(DAY, -423, GETDATE()), 0);
 GO
 
 -- 2.4 Citas (30) - todas cerradas como 'Atendida' para generar el flujo completo
 INSERT INTO Citas (PacienteID, MedicoID, FechaHora, Estado, Motivo) VALUES
-(1, 12, '2026-07-05 11:45:00', 'Atendida', 'Control por dolor abdominal'),
-(2, 19, '2026-03-06 10:00:00', 'Atendida', 'Chequeo general'),
-(3, 20, '2026-07-20 11:45:00', 'Atendida', 'Control de embarazo'),
-(4, 30, '2026-03-08 15:30:00', 'Atendida', 'Fiebre y malestar general'),
-(5, 15, '2026-05-22 08:45:00', 'Atendida', 'Dolor de cabeza persistente'),
-(6, 29, '2026-05-22 16:15:00', 'Atendida', 'Control de hipertensión'),
-(7, 3, '2026-08-12 17:30:00', 'Atendida', 'Consulta por alergia cutánea'),
-(8, 21, '2026-07-23 12:45:00', 'Atendida', 'Dolor lumbar'),
-(9, 28, '2026-05-07 14:45:00', 'Atendida', 'Control post-operatorio'),
-(10, 4, '2026-04-13 17:30:00', 'Atendida', 'Consulta pediátrica de rutina'),
-(11, 19, '2026-05-23 12:00:00', 'Atendida', 'Dolor de garganta'),
-(12, 27, '2026-07-09 08:00:00', 'Atendida', 'Control de diabetes'),
-(13, 30, '2026-08-27 12:15:00', 'Atendida', 'Consulta dermatológica'),
-(14, 20, '2026-06-08 11:30:00', 'Atendida', 'Evaluación cardiológica'),
-(15, 22, '2026-03-21 09:00:00', 'Atendida', 'Consulta por ansiedad'),
-(16, 10, '2026-08-02 17:30:00', 'Atendida', 'Control ginecológico'),
-(17, 24, '2026-03-03 12:30:00', 'Atendida', 'Consulta traumatológica por caída'),
-(18, 24, '2026-07-06 11:15:00', 'Atendida', 'Revisión odontológica'),
-(19, 26, '2026-09-12 16:30:00', 'Atendida', 'Consulta nutricional'),
-(20, 27, '2026-03-09 15:30:00', 'Atendida', 'Dolor articular'),
-(21, 24, '2026-06-26 09:45:00', 'Atendida', 'Consulta oftalmológica'),
-(22, 3, '2026-03-25 11:45:00', 'Atendida', 'Control de otitis'),
-(23, 28, '2026-09-12 09:45:00', 'Atendida', 'Consulta por gastritis'),
-(24, 1, '2026-05-18 09:45:00', 'Atendida', 'Evaluación neurológica'),
-(25, 12, '2026-05-19 14:30:00', 'Atendida', 'Consulta por infección urinaria'),
-(26, 4, '2026-04-16 08:30:00', 'Atendida', 'Control de asma'),
-(27, 30, '2026-04-21 09:45:00', 'Atendida', 'Consulta por vértigo'),
-(28, 30, '2026-05-21 14:00:00', 'Atendida', 'Evaluación geriátrica'),
-(29, 5, '2026-01-02 12:45:00', 'Atendida', 'Consulta pre-quirúrgica'),
-(30, 4, '2026-02-08 16:15:00', 'Atendida', 'Control de anemia');
+(1, 28, '2026-08-04 11:45:00', 'Atendida', 'Control por dolor abdominal'),
+(2, 19, '2026-06-19 12:30:00', 'Atendida', 'Chequeo general'),
+(3, 1, '2026-07-09 08:00:00', 'Atendida', 'Control de embarazo'),
+(4, 20, '2026-08-27 12:15:00', 'Atendida', 'Fiebre y malestar general'),
+(5, 20, '2026-06-08 11:30:00', 'Atendida', 'Dolor de cabeza persistente'),
+(6, 22, '2026-03-21 09:00:00', 'Atendida', 'Control de hipertensión'),
+(7, 10, '2026-08-02 17:30:00', 'Atendida', 'Consulta por alergia cutánea'),
+(8, 24, '2026-03-03 12:30:00', 'Atendida', 'Dolor lumbar'),
+(9, 24, '2026-07-06 11:15:00', 'Atendida', 'Control post-operatorio'),
+(10, 26, '2026-09-12 16:30:00', 'Atendida', 'Consulta pediátrica de rutina'),
+(11, 27, '2026-03-09 15:30:00', 'Atendida', 'Dolor de garganta'),
+(12, 24, '2026-06-26 09:45:00', 'Atendida', 'Control de diabetes'),
+(13, 3, '2026-03-25 11:45:00', 'Atendida', 'Consulta dermatológica'),
+(14, 28, '2026-09-12 09:45:00', 'Atendida', 'Evaluación cardiológica'),
+(15, 1, '2026-05-18 09:45:00', 'Atendida', 'Consulta por ansiedad'),
+(16, 12, '2026-05-19 14:30:00', 'Atendida', 'Control ginecológico'),
+(17, 4, '2026-04-16 08:30:00', 'Atendida', 'Consulta traumatológica por caída'),
+(18, 20, '2026-04-21 09:45:00', 'Atendida', 'Revisión odontológica'),
+(19, 23, '2026-05-21 14:00:00', 'Atendida', 'Consulta nutricional'),
+(20, 5, '2026-01-02 12:45:00', 'Atendida', 'Dolor articular'),
+(21, 4, '2026-02-08 16:15:00', 'Atendida', 'Consulta oftalmológica'),
+(22, 13, '2026-08-12 16:45:00', 'Atendida', 'Control de otitis'),
+(23, 19, '2026-03-14 09:45:00', 'Atendida', 'Consulta por gastritis'),
+(24, 20, '2026-07-09 08:30:00', 'Atendida', 'Evaluación neurológica'),
+(25, 7, '2026-08-15 11:30:00', 'Atendida', 'Consulta por infección urinaria'),
+(26, 4, '2026-06-18 13:00:00', 'Atendida', 'Control de asma'),
+(27, 13, '2026-05-07 09:45:00', 'Atendida', 'Consulta por vértigo'),
+(28, 3, '2026-04-21 17:00:00', 'Atendida', 'Evaluación geriátrica'),
+(29, 2, '2026-06-08 10:15:00', 'Atendida', 'Consulta pre-quirúrgica'),
+(30, 3, '2026-09-07 17:15:00', 'Atendida', 'Control de anemia');
 GO
 
 -- 2.5 HistorialClinico (30) - uno por cada Cita
@@ -303,37 +327,37 @@ INSERT INTO HistorialClinico (CitaID, Diagnostico, Observaciones, FechaRegistro)
 GO
 
 -- 2.6 Insumos (30)
-INSERT INTO Insumos (Nombre, Descripcion, Stock, PrecioUnitario, UnidadMedida) VALUES
-('Paracetamol 500mg', 'Analgésico/antipirético', 500, 0.2, 'tableta'),
-('Ibuprofeno 400mg', 'Antiinflamatorio', 400, 0.3, 'tableta'),
-('Amoxicilina 500mg', 'Antibiótico', 300, 0.5, 'cápsula'),
-('Omeprazol 20mg', 'Antiulceroso', 350, 0.25, 'cápsula'),
-('Loratadina 10mg', 'Antihistamínico', 250, 0.2, 'tableta'),
-('Suero fisiológico 500ml', 'Solución IV', 150, 3.5, 'frasco'),
-('Jeringa 5ml', 'Material descartable', 1000, 0.3, 'unidad'),
-('Guantes de látex', 'Material de bioseguridad', 2000, 0.15, 'unidad'),
-('Alcohol en gel 500ml', 'Antiséptico', 200, 6.0, 'frasco'),
-('Gasas estériles', 'Material de curación', 800, 0.1, 'unidad'),
-('Esparadrapo', 'Material de curación', 300, 2.5, 'rollo'),
-('Vacuna antitetánica', 'Inmunización', 100, 8.0, 'dosis'),
-('Insulina NPH', 'Antidiabético', 80, 25.0, 'frasco'),
-('Metformina 850mg', 'Antidiabético', 300, 0.2, 'tableta'),
-('Losartán 50mg', 'Antihipertensivo', 300, 0.25, 'tableta'),
-('Salbutamol inhalador', 'Broncodilatador', 120, 15.0, 'unidad'),
-('Diclofenaco 75mg inyectable', 'Antiinflamatorio', 200, 1.5, 'ampolla'),
-('Dexametasona inyectable', 'Corticoide', 150, 2.0, 'ampolla'),
-('Vendas elásticas', 'Material de curación', 300, 3.0, 'unidad'),
-('Termómetro digital', 'Equipo médico', 50, 12.0, 'unidad'),
-('Tensiómetro digital', 'Equipo médico', 20, 80.0, 'unidad'),
-('Mascarillas quirúrgicas', 'Material de bioseguridad', 3000, 0.2, 'unidad'),
-('Algodón hidrófilo', 'Material de curación', 400, 1.0, 'paquete'),
-('Yodopovidona', 'Antiséptico', 180, 4.5, 'frasco'),
-('Ranitidina 150mg', 'Antiulceroso', 250, 0.2, 'tableta'),
-('Cetirizina 10mg', 'Antihistamínico', 250, 0.2, 'tableta'),
-('Ácido fólico 5mg', 'Suplemento', 300, 0.15, 'tableta'),
-('Sulfato ferroso', 'Suplemento', 300, 0.2, 'tableta'),
-('Naproxeno 500mg', 'Antiinflamatorio', 280, 0.3, 'tableta'),
-('Azitromicina 500mg', 'Antibiótico', 200, 1.2, 'tableta');
+INSERT INTO Insumos (Nombre, Descripcion, Stock, PrecioUnitario, UnidadMedida, FechaCreacion, Activo) VALUES
+('Paracetamol 500mg', 'Analgésico/antipirético', 500, 0.2, 'tableta', DATEADD(DAY, -268, GETDATE()), 1),
+('Ibuprofeno 400mg', 'Antiinflamatorio', 400, 0.3, 'tableta', DATEADD(DAY, -366, GETDATE()), 1),
+('Amoxicilina 500mg', 'Antibiótico', 300, 0.5, 'cápsula', DATEADD(DAY, -181, GETDATE()), 1),
+('Omeprazol 20mg', 'Antiulceroso', 350, 0.25, 'cápsula', DATEADD(DAY, -32, GETDATE()), 1),
+('Loratadina 10mg', 'Antihistamínico', 250, 0.2, 'tableta', DATEADD(DAY, -313, GETDATE()), 1),
+('Suero fisiológico 500ml', 'Solución IV', 150, 3.5, 'frasco', DATEADD(DAY, -178, GETDATE()), 1),
+('Jeringa 5ml', 'Material descartable', 1000, 0.3, 'unidad', DATEADD(DAY, -163, GETDATE()), 1),
+('Guantes de látex', 'Material de bioseguridad', 2000, 0.15, 'unidad', DATEADD(DAY, -583, GETDATE()), 1),
+('Alcohol en gel 500ml', 'Antiséptico', 200, 6.0, 'frasco', DATEADD(DAY, -286, GETDATE()), 1),
+('Gasas estériles', 'Material de curación', 800, 0.1, 'unidad', DATEADD(DAY, -208, GETDATE()), 1),
+('Esparadrapo', 'Material de curación', 300, 2.5, 'rollo', DATEADD(DAY, -142, GETDATE()), 1),
+('Vacuna antitetánica', 'Inmunización', 100, 8.0, 'dosis', DATEADD(DAY, -56, GETDATE()), 1),
+('Insulina NPH', 'Antidiabético', 80, 25.0, 'frasco', DATEADD(DAY, -164, GETDATE()), 1),
+('Metformina 850mg', 'Antidiabético', 300, 0.2, 'tableta', DATEADD(DAY, -45, GETDATE()), 1),
+('Losartán 50mg', 'Antihipertensivo', 300, 0.25, 'tableta', DATEADD(DAY, -396, GETDATE()), 1),
+('Salbutamol inhalador', 'Broncodilatador', 120, 15.0, 'unidad', DATEADD(DAY, -273, GETDATE()), 1),
+('Diclofenaco 75mg inyectable', 'Antiinflamatorio', 200, 1.5, 'ampolla', DATEADD(DAY, -361, GETDATE()), 1),
+('Dexametasona inyectable', 'Corticoide', 150, 2.0, 'ampolla', DATEADD(DAY, -46, GETDATE()), 1),
+('Vendas elásticas', 'Material de curación', 300, 3.0, 'unidad', DATEADD(DAY, -208, GETDATE()), 1),
+('Termómetro digital', 'Equipo médico', 50, 12.0, 'unidad', DATEADD(DAY, -301, GETDATE()), 1),
+('Tensiómetro digital', 'Equipo médico', 20, 80.0, 'unidad', DATEADD(DAY, -83, GETDATE()), 1),
+('Mascarillas quirúrgicas', 'Material de bioseguridad', 3000, 0.2, 'unidad', DATEADD(DAY, -159, GETDATE()), 1),
+('Algodón hidrófilo', 'Material de curación', 400, 1.0, 'paquete', DATEADD(DAY, -461, GETDATE()), 1),
+('Yodopovidona', 'Antiséptico', 180, 4.5, 'frasco', DATEADD(DAY, -568, GETDATE()), 1),
+('Ranitidina 150mg', 'Antiulceroso', 250, 0.2, 'tableta', DATEADD(DAY, -146, GETDATE()), 1),
+('Cetirizina 10mg', 'Antihistamínico', 250, 0.2, 'tableta', DATEADD(DAY, -95, GETDATE()), 1),
+('Ácido fólico 5mg', 'Suplemento', 300, 0.15, 'tableta', DATEADD(DAY, -517, GETDATE()), 1),
+('Sulfato ferroso', 'Suplemento', 300, 0.2, 'tableta', DATEADD(DAY, -489, GETDATE()), 1),
+('Naproxeno 500mg', 'Antiinflamatorio', 280, 0.3, 'tableta', DATEADD(DAY, -400, GETDATE()), 1),
+('Azitromicina 500mg', 'Antibiótico', 200, 1.2, 'tableta', DATEADD(DAY, -555, GETDATE()), 1);
 GO
 
 -- 2.7 Recetas (30) - una por cada HistorialClinico
@@ -372,162 +396,337 @@ GO
 
 -- 2.8 DetalleReceta (60 - 2 insumos por receta)
 INSERT INTO DetalleReceta (RecetaID, InsumoID, Cantidad, Dosis) VALUES
-(1, 13, 12, '1 ampolla cada 24h'),
-(1, 15, 14, '1 ampolla cada 24h'),
-(2, 24, 14, '1 tableta cada 8h'),
-(2, 5, 16, '1 ampolla cada 24h'),
-(3, 14, 2, '1 cápsula cada 24h'),
-(3, 9, 7, 'Aplicar 2 veces al día'),
-(4, 15, 12, '1 tableta cada 8h'),
-(4, 8, 12, '1 ampolla cada 24h'),
-(5, 29, 12, '1 tableta cada 8h'),
-(5, 21, 13, '1 cápsula cada 24h'),
-(6, 7, 15, '1 tableta cada 8h'),
-(6, 4, 7, '1 ampolla cada 24h'),
-(7, 1, 11, '1 tableta cada 12h'),
-(7, 2, 5, '1 ampolla cada 24h'),
-(8, 7, 18, '1 tableta cada 12h'),
-(8, 3, 19, '1 tableta cada 12h'),
-(9, 27, 8, '1 cápsula cada 24h'),
-(9, 28, 5, '1 ampolla cada 24h'),
-(10, 1, 5, '1 tableta cada 12h'),
-(10, 9, 18, '1 cápsula cada 24h'),
-(11, 26, 4, '1 tableta cada 8h'),
-(11, 6, 5, '1 tableta cada 8h'),
-(12, 12, 8, '1 ampolla cada 24h'),
-(12, 26, 11, '1 tableta cada 8h'),
-(13, 6, 2, '1 tableta cada 12h'),
-(13, 9, 14, '1 ampolla cada 24h'),
-(14, 4, 3, 'Aplicar 2 veces al día'),
-(14, 24, 15, '1 cápsula cada 24h'),
-(15, 17, 4, 'Aplicar 2 veces al día'),
-(15, 19, 17, '1 tableta cada 12h'),
-(16, 20, 17, '1 cápsula cada 24h'),
-(16, 2, 15, '1 tableta cada 8h'),
-(17, 2, 13, 'Aplicar 2 veces al día'),
-(17, 16, 4, 'Aplicar 2 veces al día'),
-(18, 23, 15, '1 tableta cada 8h'),
-(18, 30, 3, '1 cápsula cada 24h'),
-(19, 20, 3, '1 tableta cada 12h'),
-(19, 5, 9, '1 ampolla cada 24h'),
-(20, 21, 18, '1 cápsula cada 24h'),
-(20, 19, 13, '1 ampolla cada 24h'),
-(21, 17, 15, '1 ampolla cada 24h'),
-(21, 10, 20, 'Aplicar 2 veces al día'),
-(22, 4, 4, '1 ampolla cada 24h'),
-(22, 26, 7, 'Aplicar 2 veces al día'),
-(23, 15, 8, 'Aplicar 2 veces al día'),
-(23, 29, 11, 'Aplicar 2 veces al día'),
-(24, 13, 4, '1 cápsula cada 24h'),
-(24, 14, 14, '1 cápsula cada 24h'),
-(25, 22, 12, '1 tableta cada 12h'),
-(25, 9, 16, '1 tableta cada 8h'),
-(26, 3, 3, '1 tableta cada 8h'),
-(26, 27, 14, '1 tableta cada 8h'),
-(27, 24, 5, '1 ampolla cada 24h'),
-(27, 12, 2, '1 ampolla cada 24h'),
-(28, 18, 4, 'Aplicar 2 veces al día'),
-(28, 11, 12, 'Aplicar 2 veces al día'),
-(29, 28, 2, '1 cápsula cada 24h'),
-(29, 30, 20, '1 cápsula cada 24h'),
-(30, 12, 19, '1 ampolla cada 24h'),
-(30, 4, 7, '1 tableta cada 12h');
+(1, 19, 1, 'Aplicar 2 veces al día'),
+(1, 17, 2, '1 ampolla cada 24h'),
+(2, 2, 5, '1 cápsula cada 24h'),
+(2, 15, 1, '1 tableta cada 8h'),
+(3, 16, 4, 'Aplicar 2 veces al día'),
+(3, 22, 1, 'Aplicar 2 veces al día'),
+(4, 23, 4, '1 tableta cada 8h'),
+(4, 29, 1, '1 cápsula cada 24h'),
+(5, 20, 2, '1 tableta cada 8h'),
+(5, 5, 3, '1 ampolla cada 24h'),
+(6, 21, 5, '1 ampolla cada 24h'),
+(6, 23, 3, 'Aplicar 2 veces al día'),
+(7, 20, 5, '1 cápsula cada 24h'),
+(7, 15, 5, '1 ampolla cada 24h'),
+(8, 14, 1, '1 tableta cada 8h'),
+(8, 28, 5, '1 tableta cada 12h'),
+(9, 14, 4, '1 tableta cada 12h'),
+(9, 14, 3, 'Aplicar 2 veces al día'),
+(10, 13, 4, '1 tableta cada 8h'),
+(10, 11, 4, '1 cápsula cada 24h'),
+(11, 22, 3, '1 cápsula cada 24h'),
+(11, 5, 4, '1 tableta cada 8h'),
+(12, 3, 1, '1 tableta cada 8h'),
+(12, 14, 1, '1 cápsula cada 24h'),
+(13, 26, 2, '1 ampolla cada 24h'),
+(13, 2, 5, '1 ampolla cada 24h'),
+(14, 18, 3, '1 tableta cada 8h'),
+(14, 14, 3, 'Aplicar 2 veces al día'),
+(15, 28, 1, '1 cápsula cada 24h'),
+(15, 20, 3, '1 cápsula cada 24h'),
+(16, 4, 5, '1 ampolla cada 24h'),
+(16, 7, 2, 'Aplicar 2 veces al día'),
+(17, 8, 1, '1 cápsula cada 24h'),
+(17, 28, 5, '1 cápsula cada 24h'),
+(18, 4, 3, '1 ampolla cada 24h'),
+(18, 8, 4, '1 ampolla cada 24h'),
+(19, 25, 5, '1 ampolla cada 24h'),
+(19, 22, 5, '1 tableta cada 8h'),
+(20, 20, 3, '1 tableta cada 8h'),
+(20, 6, 3, '1 cápsula cada 24h'),
+(21, 30, 3, '1 cápsula cada 24h'),
+(21, 1, 2, '1 tableta cada 12h'),
+(22, 19, 4, '1 tableta cada 8h'),
+(22, 5, 1, '1 tableta cada 8h'),
+(23, 24, 5, '1 tableta cada 12h'),
+(23, 13, 4, 'Aplicar 2 veces al día'),
+(24, 11, 2, '1 cápsula cada 24h'),
+(24, 10, 3, '1 ampolla cada 24h'),
+(25, 20, 1, '1 tableta cada 8h'),
+(25, 5, 2, '1 ampolla cada 24h'),
+(26, 2, 1, '1 cápsula cada 24h'),
+(26, 15, 4, 'Aplicar 2 veces al día'),
+(27, 20, 4, 'Aplicar 2 veces al día'),
+(27, 9, 2, '1 ampolla cada 24h'),
+(28, 4, 3, 'Aplicar 2 veces al día'),
+(28, 4, 3, '1 ampolla cada 24h'),
+(29, 16, 5, '1 cápsula cada 24h'),
+(29, 2, 2, 'Aplicar 2 veces al día'),
+(30, 20, 1, '1 tableta cada 8h'),
+(30, 7, 3, '1 tableta cada 12h');
 GO
 
--- 2.9 Facturas (30) - una por Cita, Serie tipo boleta electrónica
+-- 2.9 MovimientosInsumo (60) - kardex de salida por cada línea de receta
+INSERT INTO MovimientosInsumo (InsumoID, TipoMovimiento, Cantidad, StockAnterior, StockNuevo, Motivo, ReferenciaDetalleRecetaID, FechaMovimiento) VALUES
+(19, 'Salida', 1, 300, 299, 'Consumo por receta médica - Detalle #1', 1, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 1))),
+(17, 'Salida', 2, 200, 198, 'Consumo por receta médica - Detalle #2', 2, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 1))),
+(2, 'Salida', 5, 400, 395, 'Consumo por receta médica - Detalle #3', 3, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 2))),
+(15, 'Salida', 1, 300, 299, 'Consumo por receta médica - Detalle #4', 4, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 2))),
+(16, 'Salida', 4, 120, 116, 'Consumo por receta médica - Detalle #5', 5, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 3))),
+(22, 'Salida', 1, 3000, 2999, 'Consumo por receta médica - Detalle #6', 6, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 3))),
+(23, 'Salida', 4, 400, 396, 'Consumo por receta médica - Detalle #7', 7, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 4))),
+(29, 'Salida', 1, 280, 279, 'Consumo por receta médica - Detalle #8', 8, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 4))),
+(20, 'Salida', 2, 50, 48, 'Consumo por receta médica - Detalle #9', 9, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 5))),
+(5, 'Salida', 3, 250, 247, 'Consumo por receta médica - Detalle #10', 10, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 5))),
+(21, 'Salida', 5, 20, 15, 'Consumo por receta médica - Detalle #11', 11, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 6))),
+(23, 'Salida', 3, 396, 393, 'Consumo por receta médica - Detalle #12', 12, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 6))),
+(20, 'Salida', 5, 48, 43, 'Consumo por receta médica - Detalle #13', 13, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 7))),
+(15, 'Salida', 5, 299, 294, 'Consumo por receta médica - Detalle #14', 14, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 7))),
+(14, 'Salida', 1, 300, 299, 'Consumo por receta médica - Detalle #15', 15, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 8))),
+(28, 'Salida', 5, 300, 295, 'Consumo por receta médica - Detalle #16', 16, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 8))),
+(14, 'Salida', 4, 299, 295, 'Consumo por receta médica - Detalle #17', 17, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 9))),
+(14, 'Salida', 3, 295, 292, 'Consumo por receta médica - Detalle #18', 18, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 9))),
+(13, 'Salida', 4, 80, 76, 'Consumo por receta médica - Detalle #19', 19, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 10))),
+(11, 'Salida', 4, 300, 296, 'Consumo por receta médica - Detalle #20', 20, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 10))),
+(22, 'Salida', 3, 2999, 2996, 'Consumo por receta médica - Detalle #21', 21, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 11))),
+(5, 'Salida', 4, 247, 243, 'Consumo por receta médica - Detalle #22', 22, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 11))),
+(3, 'Salida', 1, 300, 299, 'Consumo por receta médica - Detalle #23', 23, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 12))),
+(14, 'Salida', 1, 292, 291, 'Consumo por receta médica - Detalle #24', 24, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 12))),
+(26, 'Salida', 2, 250, 248, 'Consumo por receta médica - Detalle #25', 25, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 13))),
+(2, 'Salida', 5, 395, 390, 'Consumo por receta médica - Detalle #26', 26, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 13))),
+(18, 'Salida', 3, 150, 147, 'Consumo por receta médica - Detalle #27', 27, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 14))),
+(14, 'Salida', 3, 291, 288, 'Consumo por receta médica - Detalle #28', 28, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 14))),
+(28, 'Salida', 1, 295, 294, 'Consumo por receta médica - Detalle #29', 29, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 15))),
+(20, 'Salida', 3, 43, 40, 'Consumo por receta médica - Detalle #30', 30, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 15))),
+(4, 'Salida', 5, 350, 345, 'Consumo por receta médica - Detalle #31', 31, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 16))),
+(7, 'Salida', 2, 1000, 998, 'Consumo por receta médica - Detalle #32', 32, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 16))),
+(8, 'Salida', 1, 2000, 1999, 'Consumo por receta médica - Detalle #33', 33, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 17))),
+(28, 'Salida', 5, 294, 289, 'Consumo por receta médica - Detalle #34', 34, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 17))),
+(4, 'Salida', 3, 345, 342, 'Consumo por receta médica - Detalle #35', 35, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 18))),
+(8, 'Salida', 4, 1999, 1995, 'Consumo por receta médica - Detalle #36', 36, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 18))),
+(25, 'Salida', 5, 250, 245, 'Consumo por receta médica - Detalle #37', 37, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 19))),
+(22, 'Salida', 5, 2996, 2991, 'Consumo por receta médica - Detalle #38', 38, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 19))),
+(20, 'Salida', 3, 40, 37, 'Consumo por receta médica - Detalle #39', 39, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 20))),
+(6, 'Salida', 3, 150, 147, 'Consumo por receta médica - Detalle #40', 40, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 20))),
+(30, 'Salida', 3, 200, 197, 'Consumo por receta médica - Detalle #41', 41, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 21))),
+(1, 'Salida', 2, 500, 498, 'Consumo por receta médica - Detalle #42', 42, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 21))),
+(19, 'Salida', 4, 299, 295, 'Consumo por receta médica - Detalle #43', 43, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 22))),
+(5, 'Salida', 1, 243, 242, 'Consumo por receta médica - Detalle #44', 44, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 22))),
+(24, 'Salida', 5, 180, 175, 'Consumo por receta médica - Detalle #45', 45, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 23))),
+(13, 'Salida', 4, 76, 72, 'Consumo por receta médica - Detalle #46', 46, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 23))),
+(11, 'Salida', 2, 296, 294, 'Consumo por receta médica - Detalle #47', 47, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 24))),
+(10, 'Salida', 3, 800, 797, 'Consumo por receta médica - Detalle #48', 48, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 24))),
+(20, 'Salida', 1, 37, 36, 'Consumo por receta médica - Detalle #49', 49, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 25))),
+(5, 'Salida', 2, 242, 240, 'Consumo por receta médica - Detalle #50', 50, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 25))),
+(2, 'Salida', 1, 390, 389, 'Consumo por receta médica - Detalle #51', 51, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 26))),
+(15, 'Salida', 4, 294, 290, 'Consumo por receta médica - Detalle #52', 52, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 26))),
+(20, 'Salida', 4, 36, 32, 'Consumo por receta médica - Detalle #53', 53, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 27))),
+(9, 'Salida', 2, 200, 198, 'Consumo por receta médica - Detalle #54', 54, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 27))),
+(4, 'Salida', 3, 342, 339, 'Consumo por receta médica - Detalle #55', 55, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 28))),
+(4, 'Salida', 3, 339, 336, 'Consumo por receta médica - Detalle #56', 56, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 28))),
+(16, 'Salida', 5, 116, 111, 'Consumo por receta médica - Detalle #57', 57, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 29))),
+(2, 'Salida', 2, 389, 387, 'Consumo por receta médica - Detalle #58', 58, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 29))),
+(20, 'Salida', 1, 32, 31, 'Consumo por receta médica - Detalle #59', 59, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 30))),
+(7, 'Salida', 3, 998, 995, 'Consumo por receta médica - Detalle #60', 60, DATEADD(MINUTE, 35, (SELECT FechaRegistro FROM HistorialClinico WHERE HistorialID = 30)));
+GO
+
+-- Sincroniza Insumos.Stock con el resultado final del kardex
+UPDATE Insumos SET Stock = 498 WHERE InsumoID = 1;
+UPDATE Insumos SET Stock = 387 WHERE InsumoID = 2;
+UPDATE Insumos SET Stock = 299 WHERE InsumoID = 3;
+UPDATE Insumos SET Stock = 336 WHERE InsumoID = 4;
+UPDATE Insumos SET Stock = 240 WHERE InsumoID = 5;
+UPDATE Insumos SET Stock = 147 WHERE InsumoID = 6;
+UPDATE Insumos SET Stock = 995 WHERE InsumoID = 7;
+UPDATE Insumos SET Stock = 1995 WHERE InsumoID = 8;
+UPDATE Insumos SET Stock = 198 WHERE InsumoID = 9;
+UPDATE Insumos SET Stock = 797 WHERE InsumoID = 10;
+UPDATE Insumos SET Stock = 294 WHERE InsumoID = 11;
+UPDATE Insumos SET Stock = 100 WHERE InsumoID = 12;
+UPDATE Insumos SET Stock = 72 WHERE InsumoID = 13;
+UPDATE Insumos SET Stock = 288 WHERE InsumoID = 14;
+UPDATE Insumos SET Stock = 290 WHERE InsumoID = 15;
+UPDATE Insumos SET Stock = 111 WHERE InsumoID = 16;
+UPDATE Insumos SET Stock = 198 WHERE InsumoID = 17;
+UPDATE Insumos SET Stock = 147 WHERE InsumoID = 18;
+UPDATE Insumos SET Stock = 295 WHERE InsumoID = 19;
+UPDATE Insumos SET Stock = 31 WHERE InsumoID = 20;
+UPDATE Insumos SET Stock = 15 WHERE InsumoID = 21;
+UPDATE Insumos SET Stock = 2991 WHERE InsumoID = 22;
+UPDATE Insumos SET Stock = 393 WHERE InsumoID = 23;
+UPDATE Insumos SET Stock = 175 WHERE InsumoID = 24;
+UPDATE Insumos SET Stock = 245 WHERE InsumoID = 25;
+UPDATE Insumos SET Stock = 248 WHERE InsumoID = 26;
+UPDATE Insumos SET Stock = 300 WHERE InsumoID = 27;
+UPDATE Insumos SET Stock = 289 WHERE InsumoID = 28;
+UPDATE Insumos SET Stock = 279 WHERE InsumoID = 29;
+UPDATE Insumos SET Stock = 197 WHERE InsumoID = 30;
+GO
+
+-- 2.10 Facturas (30) - una por Cita, Serie tipo boleta electrónica
 INSERT INTO Facturas (CitaID, Serie, Correlativo, FechaEmision, Subtotal, IGV, Total, MetodoPago, Estado) VALUES
-(1, 'B001', '00000001', '2026-04-28 09:30:00', 131.94, 23.75, 155.69, 'Yape/Plin', 'Pagada'),
-(2, 'B001', '00000002', '2026-06-04 12:30:00', 158.35, 28.5, 186.85, 'Tarjeta', 'Pagada'),
-(3, 'B001', '00000003', '2026-09-25 17:30:00', 153.01, 27.54, 180.55, 'Efectivo', 'Pagada'),
-(4, 'B001', '00000004', '2026-05-01 10:30:00', 125.26, 22.55, 147.81, 'Yape/Plin', 'Pagada'),
-(5, 'B001', '00000005', '2026-05-11 13:30:00', 138.38, 24.91, 163.29, 'Efectivo', 'Pagada'),
-(6, 'B001', '00000006', '2026-03-19 14:30:00', 65.4, 11.77, 77.17, 'Efectivo', 'Pagada'),
-(7, 'B001', '00000007', '2026-01-03 16:30:00', 59.86, 10.77, 70.63, 'Tarjeta', 'Pagada'),
-(8, 'B001', '00000008', '2026-08-11 10:30:00', 92.67, 16.68, 109.35, 'Yape/Plin', 'Pagada'),
-(9, 'B001', '00000009', '2026-06-25 17:30:00', 83.63, 15.05, 98.68, 'Efectivo', 'Pagada'),
-(10, 'B001', '00000010', '2026-03-06 17:30:00', 163.67, 29.46, 193.13, 'Efectivo', 'Pagada'),
-(11, 'B001', '00000011', '2026-05-15 14:30:00', 134.36, 24.18, 158.54, 'Transferencia', 'Pagada'),
-(12, 'B001', '00000012', '2026-07-09 11:30:00', 124.99, 22.5, 147.49, 'Efectivo', 'Pagada'),
-(13, 'B001', '00000013', '2026-02-10 17:30:00', 88.32, 15.9, 104.22, 'Transferencia', 'Pagada'),
-(14, 'B001', '00000014', '2026-05-02 11:30:00', 113.77, 20.48, 134.25, 'Transferencia', 'Pagada'),
-(15, 'B001', '00000015', '2026-01-01 11:30:00', 177.82, 32.01, 209.83, 'Yape/Plin', 'Pagada'),
-(16, 'B001', '00000016', '2026-03-25 12:30:00', 172.35, 31.02, 203.37, 'Yape/Plin', 'Pagada'),
-(17, 'B001', '00000017', '2026-01-16 14:30:00', 85.94, 15.47, 101.41, 'Tarjeta', 'Pagada'),
-(18, 'B001', '00000018', '2026-09-23 11:30:00', 58.09, 10.46, 68.55, 'Yape/Plin', 'Pagada'),
-(19, 'B001', '00000019', '2026-01-14 08:30:00', 50.09, 9.02, 59.11, 'Transferencia', 'Pagada'),
-(20, 'B001', '00000020', '2026-06-19 14:30:00', 168.96, 30.41, 199.37, 'Transferencia', 'Pagada'),
-(21, 'B001', '00000021', '2026-07-10 09:30:00', 139.33, 25.08, 164.41, 'Transferencia', 'Pagada'),
-(22, 'B001', '00000022', '2026-06-06 17:30:00', 42.92, 7.73, 50.65, 'Transferencia', 'Pagada'),
-(23, 'B001', '00000023', '2026-06-03 14:30:00', 156.48, 28.17, 184.65, 'Efectivo', 'Pagada'),
-(24, 'B001', '00000024', '2026-07-17 09:30:00', 74.06, 13.33, 87.39, 'Transferencia', 'Pagada'),
-(25, 'B001', '00000025', '2026-06-08 13:30:00', 161.87, 29.14, 191.01, 'Tarjeta', 'Pagada'),
-(26, 'B001', '00000026', '2026-02-17 16:30:00', 50.69, 9.12, 59.81, 'Tarjeta', 'Pagada'),
-(27, 'B001', '00000027', '2026-06-12 10:30:00', 166.83, 30.03, 196.86, 'Tarjeta', 'Pagada'),
-(28, 'B001', '00000028', '2026-05-07 10:30:00', 54.39, 9.79, 64.18, 'Tarjeta', 'Pagada'),
-(29, 'B001', '00000029', '2026-02-06 15:30:00', 146.43, 26.36, 172.79, 'Transferencia', 'Pagada'),
-(30, 'B001', '00000030', '2026-08-22 17:30:00', 145.62, 26.21, 171.83, 'Yape/Plin', 'Pagada');
+(1, 'B001', '00000001', '2026-05-10 13:30:00', 147.43, 26.54, 173.97, 'Efectivo', 'Pagada'),
+(2, 'B001', '00000002', '2026-07-06 10:30:00', 41.08, 7.39, 48.47, 'Transferencia', 'Pagada'),
+(3, 'B001', '00000003', '2026-04-17 16:30:00', 114.56, 20.62, 135.18, 'Yape/Plin', 'Pagada'),
+(4, 'B001', '00000004', '2026-01-14 08:30:00', 50.09, 9.02, 59.11, 'Transferencia', 'Pagada'),
+(5, 'B001', '00000005', '2026-06-19 14:30:00', 168.96, 30.41, 199.37, 'Transferencia', 'Pagada'),
+(6, 'B001', '00000006', '2026-07-10 09:30:00', 139.33, 25.08, 164.41, 'Transferencia', 'Pagada'),
+(7, 'B001', '00000007', '2026-06-06 17:30:00', 42.92, 7.73, 50.65, 'Transferencia', 'Pagada'),
+(8, 'B001', '00000008', '2026-06-03 14:30:00', 156.48, 28.17, 184.65, 'Efectivo', 'Pagada'),
+(9, 'B001', '00000009', '2026-07-17 09:30:00', 74.06, 13.33, 87.39, 'Transferencia', 'Pagada'),
+(10, 'B001', '00000010', '2026-06-08 13:30:00', 161.87, 29.14, 191.01, 'Tarjeta', 'Pagada'),
+(11, 'B001', '00000011', '2026-02-17 16:30:00', 50.69, 9.12, 59.81, 'Tarjeta', 'Pagada'),
+(12, 'B001', '00000012', '2026-06-12 10:30:00', 166.83, 30.03, 196.86, 'Tarjeta', 'Pagada'),
+(13, 'B001', '00000013', '2026-05-07 10:30:00', 54.39, 9.79, 64.18, 'Tarjeta', 'Pagada'),
+(14, 'B001', '00000014', '2026-02-06 15:30:00', 146.43, 26.36, 172.79, 'Transferencia', 'Pagada'),
+(15, 'B001', '00000015', '2026-08-22 17:30:00', 145.62, 26.21, 171.83, 'Yape/Plin', 'Pagada'),
+(16, 'B001', '00000016', '2026-06-05 15:30:00', 160.99, 28.98, 189.97, 'Efectivo', 'Pagada'),
+(17, 'B001', '00000017', '2026-05-26 12:30:00', 105.65, 19.02, 124.67, 'Efectivo', 'Pagada'),
+(18, 'B001', '00000018', '2026-02-10 15:30:00', 89.27, 16.07, 105.34, 'Transferencia', 'Pagada'),
+(19, 'B001', '00000019', '2026-06-27 12:30:00', 45.27, 8.15, 53.42, 'Efectivo', 'Pagada'),
+(20, 'B001', '00000020', '2026-02-20 17:30:00', 130.25, 23.45, 153.7, 'Transferencia', 'Pagada'),
+(21, 'B001', '00000021', '2026-09-26 08:30:00', 104.78, 18.86, 123.64, 'Transferencia', 'Pagada'),
+(22, 'B001', '00000022', '2026-04-11 17:30:00', 167.27, 30.11, 197.38, 'Transferencia', 'Pagada'),
+(23, 'B001', '00000023', '2026-01-15 09:30:00', 110.19, 19.83, 130.02, 'Yape/Plin', 'Pagada'),
+(24, 'B001', '00000024', '2026-02-17 10:30:00', 177.53, 31.96, 209.49, 'Efectivo', 'Pagada'),
+(25, 'B001', '00000025', '2026-08-15 16:30:00', 74.68, 13.44, 88.12, 'Tarjeta', 'Pagada'),
+(26, 'B001', '00000026', '2026-05-13 14:30:00', 90.95, 16.37, 107.32, 'Yape/Plin', 'Pagada'),
+(27, 'B001', '00000027', '2026-01-26 13:30:00', 135.05, 24.31, 159.36, 'Efectivo', 'Pagada'),
+(28, 'B001', '00000028', '2026-09-22 14:30:00', 86.16, 15.51, 101.67, 'Yape/Plin', 'Pagada'),
+(29, 'B001', '00000029', '2026-03-11 09:30:00', 75.28, 13.55, 88.83, 'Tarjeta', 'Pagada'),
+(30, 'B001', '00000030', '2026-05-21 14:30:00', 168.34, 30.3, 198.64, 'Tarjeta', 'Pagada');
 GO
 
--- 2.10 DetalleFactura (60 - línea de consulta + línea de insumos por factura)
+-- 2.11 DetalleFactura (60 - línea de consulta + línea de insumos por factura)
 INSERT INTO DetalleFactura (FacturaID, Descripcion, Cantidad, PrecioUnitario, Subtotal) VALUES
-(1, 'Consulta médica especializada', 1, 92.36, 92.36),
-(1, 'Insumos y medicamentos recetados', 1, 39.58, 39.58),
-(2, 'Consulta médica especializada', 1, 110.84, 110.84),
-(2, 'Insumos y medicamentos recetados', 1, 47.51, 47.51),
-(3, 'Consulta médica especializada', 1, 107.11, 107.11),
-(3, 'Insumos y medicamentos recetados', 1, 45.9, 45.9),
-(4, 'Consulta médica especializada', 1, 87.68, 87.68),
-(4, 'Insumos y medicamentos recetados', 1, 37.58, 37.58),
-(5, 'Consulta médica especializada', 1, 96.87, 96.87),
-(5, 'Insumos y medicamentos recetados', 1, 41.51, 41.51),
-(6, 'Consulta médica especializada', 1, 45.78, 45.78),
-(6, 'Insumos y medicamentos recetados', 1, 19.62, 19.62),
-(7, 'Consulta médica especializada', 1, 41.9, 41.9),
-(7, 'Insumos y medicamentos recetados', 1, 17.96, 17.96),
-(8, 'Consulta médica especializada', 1, 64.87, 64.87),
-(8, 'Insumos y medicamentos recetados', 1, 27.8, 27.8),
-(9, 'Consulta médica especializada', 1, 58.54, 58.54),
-(9, 'Insumos y medicamentos recetados', 1, 25.09, 25.09),
-(10, 'Consulta médica especializada', 1, 114.57, 114.57),
-(10, 'Insumos y medicamentos recetados', 1, 49.1, 49.1),
-(11, 'Consulta médica especializada', 1, 94.05, 94.05),
-(11, 'Insumos y medicamentos recetados', 1, 40.31, 40.31),
-(12, 'Consulta médica especializada', 1, 87.49, 87.49),
-(12, 'Insumos y medicamentos recetados', 1, 37.5, 37.5),
-(13, 'Consulta médica especializada', 1, 61.82, 61.82),
-(13, 'Insumos y medicamentos recetados', 1, 26.5, 26.5),
-(14, 'Consulta médica especializada', 1, 79.64, 79.64),
-(14, 'Insumos y medicamentos recetados', 1, 34.13, 34.13),
-(15, 'Consulta médica especializada', 1, 124.47, 124.47),
-(15, 'Insumos y medicamentos recetados', 1, 53.35, 53.35),
-(16, 'Consulta médica especializada', 1, 120.64, 120.64),
-(16, 'Insumos y medicamentos recetados', 1, 51.71, 51.71),
-(17, 'Consulta médica especializada', 1, 60.16, 60.16),
-(17, 'Insumos y medicamentos recetados', 1, 25.78, 25.78),
-(18, 'Consulta médica especializada', 1, 40.66, 40.66),
-(18, 'Insumos y medicamentos recetados', 1, 17.43, 17.43),
-(19, 'Consulta médica especializada', 1, 35.06, 35.06),
-(19, 'Insumos y medicamentos recetados', 1, 15.03, 15.03),
-(20, 'Consulta médica especializada', 1, 118.27, 118.27),
-(20, 'Insumos y medicamentos recetados', 1, 50.69, 50.69),
-(21, 'Consulta médica especializada', 1, 97.53, 97.53),
-(21, 'Insumos y medicamentos recetados', 1, 41.8, 41.8),
-(22, 'Consulta médica especializada', 1, 30.04, 30.04),
-(22, 'Insumos y medicamentos recetados', 1, 12.88, 12.88),
-(23, 'Consulta médica especializada', 1, 109.54, 109.54),
-(23, 'Insumos y medicamentos recetados', 1, 46.94, 46.94),
-(24, 'Consulta médica especializada', 1, 51.84, 51.84),
-(24, 'Insumos y medicamentos recetados', 1, 22.22, 22.22),
-(25, 'Consulta médica especializada', 1, 113.31, 113.31),
-(25, 'Insumos y medicamentos recetados', 1, 48.56, 48.56),
-(26, 'Consulta médica especializada', 1, 35.48, 35.48),
-(26, 'Insumos y medicamentos recetados', 1, 15.21, 15.21),
-(27, 'Consulta médica especializada', 1, 116.78, 116.78),
-(27, 'Insumos y medicamentos recetados', 1, 50.05, 50.05),
-(28, 'Consulta médica especializada', 1, 38.07, 38.07),
-(28, 'Insumos y medicamentos recetados', 1, 16.32, 16.32),
-(29, 'Consulta médica especializada', 1, 102.5, 102.5),
-(29, 'Insumos y medicamentos recetados', 1, 43.93, 43.93),
-(30, 'Consulta médica especializada', 1, 101.93, 101.93),
-(30, 'Insumos y medicamentos recetados', 1, 43.69, 43.69);
+(1, 'Consulta médica especializada', 1, 103.2, 103.2),
+(1, 'Insumos y medicamentos recetados', 1, 44.23, 44.23),
+(2, 'Consulta médica especializada', 1, 28.76, 28.76),
+(2, 'Insumos y medicamentos recetados', 1, 12.32, 12.32),
+(3, 'Consulta médica especializada', 1, 80.19, 80.19),
+(3, 'Insumos y medicamentos recetados', 1, 34.37, 34.37),
+(4, 'Consulta médica especializada', 1, 35.06, 35.06),
+(4, 'Insumos y medicamentos recetados', 1, 15.03, 15.03),
+(5, 'Consulta médica especializada', 1, 118.27, 118.27),
+(5, 'Insumos y medicamentos recetados', 1, 50.69, 50.69),
+(6, 'Consulta médica especializada', 1, 97.53, 97.53),
+(6, 'Insumos y medicamentos recetados', 1, 41.8, 41.8),
+(7, 'Consulta médica especializada', 1, 30.04, 30.04),
+(7, 'Insumos y medicamentos recetados', 1, 12.88, 12.88),
+(8, 'Consulta médica especializada', 1, 109.54, 109.54),
+(8, 'Insumos y medicamentos recetados', 1, 46.94, 46.94),
+(9, 'Consulta médica especializada', 1, 51.84, 51.84),
+(9, 'Insumos y medicamentos recetados', 1, 22.22, 22.22),
+(10, 'Consulta médica especializada', 1, 113.31, 113.31),
+(10, 'Insumos y medicamentos recetados', 1, 48.56, 48.56),
+(11, 'Consulta médica especializada', 1, 35.48, 35.48),
+(11, 'Insumos y medicamentos recetados', 1, 15.21, 15.21),
+(12, 'Consulta médica especializada', 1, 116.78, 116.78),
+(12, 'Insumos y medicamentos recetados', 1, 50.05, 50.05),
+(13, 'Consulta médica especializada', 1, 38.07, 38.07),
+(13, 'Insumos y medicamentos recetados', 1, 16.32, 16.32),
+(14, 'Consulta médica especializada', 1, 102.5, 102.5),
+(14, 'Insumos y medicamentos recetados', 1, 43.93, 43.93),
+(15, 'Consulta médica especializada', 1, 101.93, 101.93),
+(15, 'Insumos y medicamentos recetados', 1, 43.69, 43.69),
+(16, 'Consulta médica especializada', 1, 112.69, 112.69),
+(16, 'Insumos y medicamentos recetados', 1, 48.3, 48.3),
+(17, 'Consulta médica especializada', 1, 73.95, 73.95),
+(17, 'Insumos y medicamentos recetados', 1, 31.7, 31.7),
+(18, 'Consulta médica especializada', 1, 62.49, 62.49),
+(18, 'Insumos y medicamentos recetados', 1, 26.78, 26.78),
+(19, 'Consulta médica especializada', 1, 31.69, 31.69),
+(19, 'Insumos y medicamentos recetados', 1, 13.58, 13.58),
+(20, 'Consulta médica especializada', 1, 91.17, 91.17),
+(20, 'Insumos y medicamentos recetados', 1, 39.08, 39.08),
+(21, 'Consulta médica especializada', 1, 73.35, 73.35),
+(21, 'Insumos y medicamentos recetados', 1, 31.43, 31.43),
+(22, 'Consulta médica especializada', 1, 117.09, 117.09),
+(22, 'Insumos y medicamentos recetados', 1, 50.18, 50.18),
+(23, 'Consulta médica especializada', 1, 77.13, 77.13),
+(23, 'Insumos y medicamentos recetados', 1, 33.06, 33.06),
+(24, 'Consulta médica especializada', 1, 124.27, 124.27),
+(24, 'Insumos y medicamentos recetados', 1, 53.26, 53.26),
+(25, 'Consulta médica especializada', 1, 52.28, 52.28),
+(25, 'Insumos y medicamentos recetados', 1, 22.4, 22.4),
+(26, 'Consulta médica especializada', 1, 63.66, 63.66),
+(26, 'Insumos y medicamentos recetados', 1, 27.29, 27.29),
+(27, 'Consulta médica especializada', 1, 94.53, 94.53),
+(27, 'Insumos y medicamentos recetados', 1, 40.52, 40.52),
+(28, 'Consulta médica especializada', 1, 60.31, 60.31),
+(28, 'Insumos y medicamentos recetados', 1, 25.85, 25.85),
+(29, 'Consulta médica especializada', 1, 52.7, 52.7),
+(29, 'Insumos y medicamentos recetados', 1, 22.58, 22.58),
+(30, 'Consulta médica especializada', 1, 117.84, 117.84),
+(30, 'Insumos y medicamentos recetados', 1, 50.5, 50.5);
 GO
+
+-- ============================================================
+-- 3. PROCEDIMIENTO: IMPRESIÓN ASCII DE BOLETA (para captura de pantalla)
+-- ============================================================
+
+CREATE PROCEDURE sp_ImprimirFacturaASCII
+    @FacturaID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @Serie CHAR(4), @Correlativo VARCHAR(8), @Fecha DATETIME,
+            @Subtotal DECIMAL(10,2), @IGV DECIMAL(10,2), @Total DECIMAL(10,2),
+            @MetodoPago VARCHAR(20), @PacienteNombre VARCHAR(130), @PacienteDNI CHAR(8),
+            @MedicoNombre VARCHAR(130), @Especialidad VARCHAR(100);
+
+    SELECT
+        @Serie = f.Serie, @Correlativo = f.Correlativo, @Fecha = f.FechaEmision,
+        @Subtotal = f.Subtotal, @IGV = f.IGV, @Total = f.Total, @MetodoPago = f.MetodoPago,
+        @PacienteNombre = p.Nombres + ' ' + p.Apellidos, @PacienteDNI = p.DNI,
+        @MedicoNombre = m.Nombres + ' ' + m.Apellidos, @Especialidad = e.Nombre
+    FROM Facturas f
+    JOIN Citas c ON c.CitaID = f.CitaID
+    JOIN Pacientes p ON p.PacienteID = c.PacienteID
+    JOIN Medicos m ON m.MedicoID = c.MedicoID
+    JOIN Especialidades e ON e.EspecialidadID = m.EspecialidadID
+    WHERE f.FacturaID = @FacturaID;
+
+    IF @Serie IS NULL
+    BEGIN
+        PRINT 'Factura no encontrada.';
+        RETURN;
+    END
+
+    PRINT REPLICATE('=', 42);
+    PRINT '      CLINICA LIMATAMBO CAJAMARCA';
+    PRINT '      RUC: 20609876541';
+    PRINT '      Jr. Amazonas 450, Cajamarca';
+    PRINT REPLICATE('=', 42);
+    PRINT 'BOLETA DE VENTA ELECTRONICA';
+    PRINT 'Serie: ' + @Serie + '   N°: ' + @Correlativo;
+    PRINT 'Fecha: ' + CONVERT(VARCHAR(20), @Fecha, 103) + ' ' + CONVERT(VARCHAR(8), @Fecha, 108);
+    PRINT REPLICATE('-', 42);
+    PRINT 'Paciente : ' + @PacienteNombre;
+    PRINT 'DNI      : ' + @PacienteDNI;
+    PRINT 'Medico   : ' + @MedicoNombre;
+    PRINT 'Espec.   : ' + @Especialidad;
+    PRINT REPLICATE('-', 42);
+    PRINT LEFT('DESCRIPCION' + SPACE(30), 26) + RIGHT(SPACE(6) + 'CANT', 6) + RIGHT(SPACE(9) + 'IMPORTE', 9);
+
+    DECLARE @Desc VARCHAR(150), @Cant INT, @Precio DECIMAL(10,2), @Sub DECIMAL(10,2);
+    DECLARE detalle_cursor CURSOR FOR
+        SELECT Descripcion, Cantidad, PrecioUnitario, Subtotal
+        FROM DetalleFactura WHERE FacturaID = @FacturaID;
+    OPEN detalle_cursor;
+    FETCH NEXT FROM detalle_cursor INTO @Desc, @Cant, @Precio, @Sub;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        PRINT LEFT(@Desc + SPACE(30), 26)
+            + RIGHT(SPACE(6) + CONVERT(VARCHAR, @Cant), 6)
+            + RIGHT(SPACE(9) + CONVERT(VARCHAR, @Sub), 9);
+        FETCH NEXT FROM detalle_cursor INTO @Desc, @Cant, @Precio, @Sub;
+    END
+    CLOSE detalle_cursor;
+    DEALLOCATE detalle_cursor;
+
+    PRINT REPLICATE('-', 42);
+    PRINT RIGHT(SPACE(30) + 'Subtotal: S/ ' + CONVERT(VARCHAR, @Subtotal), 42);
+    PRINT RIGHT(SPACE(30) + 'IGV(18%): S/ ' + CONVERT(VARCHAR, @IGV), 42);
+    PRINT RIGHT(SPACE(30) + 'TOTAL:    S/ ' + CONVERT(VARCHAR, @Total), 42);
+    PRINT REPLICATE('=', 42);
+    PRINT 'Forma de pago: ' + @MetodoPago;
+    PRINT REPLICATE('=', 42);
+    PRINT '     ¡Gracias por su preferencia!';
+    PRINT REPLICATE('=', 42);
+END
+GO
+
