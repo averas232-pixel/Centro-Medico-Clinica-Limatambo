@@ -1,8 +1,6 @@
 /* ============================================================
-   Sistema Transaccional - Clínica Limatambo Cajamarca 
-   v2: + auditoría (FechaCreacion/Activo), + kardex de insumos
-       (MovimientosInsumo), Facturas.CitaID ya no es UNIQUE,
-       + procedimiento de impresión ASCII de boleta.
+   Sistema de Gestión - Clínica Limatambo Cajamarca
+   Base de datos: CentroMedicoDB
    ============================================================ */
 
 IF DB_ID('CentroMedicoDB') IS NULL
@@ -108,8 +106,7 @@ CREATE TABLE DetalleReceta (
 );
 GO
 
--- Kardex: cada descuento/ingreso de stock queda trazado (pedido explícito:
--- trazabilidad del descuento de insumos en la transacción crítica)
+-- Kardex de insumos: registra cada entrada/salida de stock con su referencia de origen
 CREATE TABLE MovimientosInsumo (
     MovimientoID INT IDENTITY(1,1) PRIMARY KEY,
     InsumoID INT NOT NULL,
@@ -127,7 +124,7 @@ GO
 
 CREATE TABLE Facturas (
     FacturaID INT IDENTITY(1,1) PRIMARY KEY,
-    CitaID INT NOT NULL,  -- ya no es UNIQUE: permite reemisión / notas de crédito a futuro
+    CitaID INT NOT NULL,
     Serie CHAR(4) NOT NULL,
     Correlativo VARCHAR(8) NOT NULL,
     FechaEmision DATETIME NOT NULL,
@@ -730,3 +727,5 @@ BEGIN
 END
 GO
 
+-- Ejemplo de uso (ejecutar y revisar la pestaña "Messages" en SSMS):
+-- EXEC sp_ImprimirFacturaASCII @FacturaID = 1;
