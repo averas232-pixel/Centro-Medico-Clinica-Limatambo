@@ -19,7 +19,6 @@ namespace Centro_Medico_UI.Views
     {
         public AgendaView()
         {
-            InitializeComponent();
         }
     }
 }

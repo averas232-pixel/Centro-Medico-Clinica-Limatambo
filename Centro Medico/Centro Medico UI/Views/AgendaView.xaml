@@ -16,11 +16,7 @@
         <Border Grid.Row="0" Background="White" Padding="24,16"
                 BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Border Background="{StaticResource PrimaryBrush}" CornerRadius="8"
-                        Width="36" Height="36" Margin="0,0,10,0">
-                    <TextBlock Text="+" FontSize="22" FontWeight="Bold" Foreground="White"
-                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
+                <Image Source="/Assets/Images/logo_limatambo.png" Height="36" Stretch="Uniform" Margin="0,0,10,0"/>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="CLINICA LIMATAMBO" FontSize="16" FontWeight="Bold"
                                Foreground="{StaticResource TextPrimaryBrush}" LineHeight="18"/>

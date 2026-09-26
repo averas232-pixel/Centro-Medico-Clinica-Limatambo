@@ -36,6 +36,20 @@ namespace CentroMedico.Infrastructure.Repositories
             return lista;
         }
 
+        public List<Cita> ObtenerTodas()
+        {
+            var lista = new List<Cita>();
+            using var conn = (SqlConnection)SqlConnectionFactory.CrearConexion();
+            using var cmd = new SqlCommand(
+                "SELECT CitaID, PacienteID, MedicoID, FechaHora, Estado, Motivo FROM Citas ORDER BY FechaHora DESC", conn);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                lista.Add(Mapear(reader));
+
+            return lista;
+        }
+
         public int Registrar(Cita cita)
         {
             using var conn = (SqlConnection)SqlConnectionFactory.CrearConexion();

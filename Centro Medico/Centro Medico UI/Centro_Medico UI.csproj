@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\Images\banner_clinica_LimaTambo.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
   </ItemGroup>
@@ -17,6 +21,10 @@
   <ItemGroup>
     <ProjectReference Include="..\CentroMedico.Application\CentroMedico.Application.csproj" />
     <ProjectReference Include="..\CentroMedico.Infrastructure\CentroMedico.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Images\banner_clinica_LimaTambo.jpg" />
   </ItemGroup>
 
 </Project>

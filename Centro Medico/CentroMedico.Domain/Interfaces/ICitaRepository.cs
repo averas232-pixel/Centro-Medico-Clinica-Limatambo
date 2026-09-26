@@ -8,6 +8,7 @@ namespace CentroMedico.Domain.Interfaces
     {
         Cita ObtenerPorId(int id);
         List<Cita> ObtenerAgendaDelDia(DateTime fecha);
+        List<Cita> ObtenerTodas();
         int Registrar(Cita cita);
     }
 }

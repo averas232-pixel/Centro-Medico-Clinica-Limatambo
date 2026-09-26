@@ -17,6 +17,9 @@ namespace CentroMedico.Application.Services
         public List<Cita> ObtenerAgendaDelDia(DateTime fecha)
             => _citaRepository.ObtenerAgendaDelDia(fecha);
 
+        public List<Cita> ObtenerTodas()
+            => _citaRepository.ObtenerTodas();
+
         public int RegistrarCita(NuevaCitaDto dto)
         {
             if (dto.PacienteID <= 0 || dto.MedicoID <= 0)

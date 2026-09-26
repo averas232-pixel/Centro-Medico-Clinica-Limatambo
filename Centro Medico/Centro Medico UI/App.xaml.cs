@@ -40,6 +40,7 @@ namespace Centro_Medico_UI
             services.AddScoped<IConsultaService, ConsultaService>();
             services.AddScoped<ICitaService, CitaService>();
             services.AddScoped<IPacienteService, PacienteService>();
+            services.AddScoped<IInsumoService, InsumoService>();
 
             // Ventanas
             services.AddTransient<MainWindow>();

@@ -1,0 +1,135 @@
+﻿<UserControl x:Class="Centro_Medico_UI.Views.ConsultaView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="700" d:DesignWidth="1000"
+             Background="{StaticResource BackgroundBrush}">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Text="Cierre de Consulta" Style="{StaticResource TitleText}" Margin="0,0,0,16"/>
+
+            <!-- ===== Bloque 1: Cita + Diagnóstico ===== -->
+            <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="Datos de la Consulta" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
+
+                    <TextBlock Text="Cita del paciente" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                    <ComboBox ItemsSource="{Binding Citas}" SelectedItem="{Binding CitaSeleccionada}"
+                              DisplayMemberPath="Motivo" Margin="0,0,0,12" Padding="8,6"/>
+
+                    <TextBlock Text="Diagnóstico" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                    <TextBox Text="{Binding Diagnostico, UpdateSourceTrigger=PropertyChanged}"
+                             Padding="8,6" Margin="0,0,0,12"/>
+
+                    <TextBlock Text="Observaciones" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                    <TextBox Text="{Binding Observaciones, UpdateSourceTrigger=PropertyChanged}"
+                             Padding="8,6" AcceptsReturn="True" Height="60" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                    <TextBlock Text="Indicaciones de la receta" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                    <TextBox Text="{Binding IndicacionesReceta, UpdateSourceTrigger=PropertyChanged}"
+                             Padding="8,6" AcceptsReturn="True" Height="60" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== Bloque 2: Agregar insumos a la receta ===== -->
+            <Border Grid.Row="2" Style="{StaticResource CardBorder}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="Insumos Recetados" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
+
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="90"/>
+                            <ColumnDefinition Width="200"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <ComboBox Grid.Column="0" ItemsSource="{Binding InsumosDisponibles}"
+                                  SelectedItem="{Binding InsumoSeleccionado}"
+                                  DisplayMemberPath="Nombre" Margin="0,0,8,0" Padding="8,6"/>
+                        <TextBox Grid.Column="1" Text="{Binding CantidadInsumo, UpdateSourceTrigger=PropertyChanged}"
+                                 Padding="8,6" Margin="0,0,8,0"/>
+                        <TextBox Grid.Column="2" Text="{Binding DosisInsumo, UpdateSourceTrigger=PropertyChanged}"
+                                 Padding="8,6" Margin="0,0,8,0"
+                                 Tag="Dosis (ej: 1 tableta cada 8h)"/>
+                        <Button Grid.Column="3" Content="AGREGAR" Command="{Binding AgregarInsumoCommand}"
+                                Style="{StaticResource PrimaryButton}"/>
+                    </Grid>
+
+                    <DataGrid ItemsSource="{Binding ItemsReceta}" AutoGenerateColumns="False"
+                              IsReadOnly="True" CanUserAddRows="False" Height="150"
+                              Style="{StaticResource ModernDataGrid}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="INSUMO" Binding="{Binding NombreInsumo}" Width="*"/>
+                            <DataGridTextColumn Header="CANTIDAD" Binding="{Binding Cantidad}" Width="100"/>
+                            <DataGridTextColumn Header="DOSIS" Binding="{Binding Dosis}" Width="220"/>
+                            <DataGridTemplateColumn Header="" Width="100">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="Quitar" Padding="8,2"
+                                                Command="{Binding DataContext.QuitarInsumoCommand,
+                                                          RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== Bloque 3: Pago y cierre ===== -->
+            <Border Grid.Row="3" Style="{StaticResource CardBorder}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="Facturación" FontWeight="Bold" FontSize="15" Margin="0,0,0,12"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                            <TextBlock Text="Monto de consulta (S/)" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding MontoConsulta, UpdateSourceTrigger=PropertyChanged}" Padding="8,6"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Método de pago" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <ComboBox ItemsSource="{Binding MetodosPago}" SelectedItem="{Binding MetodoPagoSeleccionado}" Padding="8,6"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ===== Mensaje + botón final ===== -->
+            <StackPanel Grid.Row="4" Orientation="Horizontal">
+                <Button Content="CERRAR CONSULTA Y EMITIR BOLETA" Command="{Binding CerrarConsultaCommand}"
+                        Style="{StaticResource PrimaryButton}" Padding="24,12"/>
+                <TextBlock Text="{Binding Mensaje}" VerticalAlignment="Center" Margin="16,0,0,0"
+                           FontWeight="Bold" TextWrapping="Wrap" MaxWidth="500">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="Green"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding EsError}" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>
