@@ -1,12 +1,16 @@
 ﻿<Application x:Class="Centro_Medico_UI.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:Centro_Medico_UI">
+             xmlns:local="clr-namespace:Centro_Medico_UI"
+             xmlns:conv="clr-namespace:Centro_Medico_UI.Converters">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Styles/BrandTheme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+
+            <conv:EstadoFacturaBgConverter x:Key="EstadoBgConverter"/>
+            <conv:EstadoFacturaFgConverter x:Key="EstadoFgConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

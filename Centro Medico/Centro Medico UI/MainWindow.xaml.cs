@@ -10,6 +10,8 @@ namespace Centro_Medico_UI
     {
         private AgendaView _agendaView;
         private ConsultaView _consultaView;
+        private HistorialView _historialView;
+        private FacturacionView _facturacionView;
 
         public MainWindow()
         {
@@ -43,10 +45,25 @@ namespace Centro_Medico_UI
 
         private void NavHistorial_Checked(object sender, RoutedEventArgs e)
         {
+            if (_historialView == null)
+            {
+                var pacienteService = App.ServiceProvider.GetRequiredService<IPacienteService>();
+                var historialService = App.ServiceProvider.GetRequiredService<IHistorialService>();
+                var viewModel = new HistorialViewModel(pacienteService, historialService);
+                _historialView = new HistorialView { DataContext = viewModel };
+            }
+            ContenidoPrincipal.Content = _historialView;
         }
 
         private void NavFacturacion_Checked(object sender, RoutedEventArgs e)
         {
+            if (_facturacionView == null)
+            {
+                var facturaService = App.ServiceProvider.GetRequiredService<IFacturaService>();
+                var viewModel = new FacturacionViewModel(facturaService);
+                _facturacionView = new FacturacionView { DataContext = viewModel };
+            }
+            ContenidoPrincipal.Content = _facturacionView;
         }
     }
 }

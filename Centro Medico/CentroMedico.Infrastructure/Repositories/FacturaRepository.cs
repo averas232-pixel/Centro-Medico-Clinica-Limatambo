@@ -9,12 +9,17 @@ namespace CentroMedico.Infrastructure.Repositories
 {
     public class FacturaRepository : IFacturaRepository
     {
+        private const string ConsultaFacturas =
+            "SELECT f.FacturaID, f.CitaID, f.Serie, f.Correlativo, f.Subtotal, f.IGV, f.Total, " +
+            "f.MetodoPago, f.Estado, LTRIM(RTRIM(CONCAT(p.Nombres, ' ', p.Apellidos))) AS NombrePaciente " +
+            "FROM Facturas f " +
+            "JOIN Citas c ON c.CitaID = f.CitaID " +
+            "JOIN Pacientes p ON p.PacienteID = c.PacienteID ";
+
         public Factura ObtenerPorId(int id)
         {
             using var conn = (SqlConnection)SqlConnectionFactory.CrearConexion();
-            using var cmd = new SqlCommand(
-                "SELECT FacturaID, CitaID, Serie, Correlativo, Subtotal, IGV, Total, MetodoPago, Estado " +
-                "FROM Facturas WHERE FacturaID = @id", conn);
+            using var cmd = new SqlCommand(ConsultaFacturas + "WHERE f.FacturaID = @id", conn);
             cmd.Parameters.AddWithValue("@id", id);
 
             Factura factura;
@@ -43,13 +48,25 @@ namespace CentroMedico.Infrastructure.Repositories
             return factura;
         }
 
+        public List<Factura> ObtenerTodas()
+        {
+            var lista = new List<Factura>();
+            using var conn = (SqlConnection)SqlConnectionFactory.CrearConexion();
+            using var cmd = new SqlCommand(ConsultaFacturas + "ORDER BY f.FechaEmision DESC", conn);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                lista.Add(Mapear(reader));
+
+            return lista;
+        }
+
         public List<Factura> ObtenerPorRangoFechas(DateTime desde, DateTime hasta)
         {
             var lista = new List<Factura>();
             using var conn = (SqlConnection)SqlConnectionFactory.CrearConexion();
             using var cmd = new SqlCommand(
-                "SELECT FacturaID, CitaID, Serie, Correlativo, Subtotal, IGV, Total, MetodoPago, Estado " +
-                "FROM Facturas WHERE FechaEmision BETWEEN @desde AND @hasta ORDER BY FechaEmision DESC", conn);
+                ConsultaFacturas + "WHERE f.FechaEmision BETWEEN @desde AND @hasta ORDER BY f.FechaEmision DESC", conn);
             cmd.Parameters.AddWithValue("@desde", desde);
             cmd.Parameters.AddWithValue("@hasta", hasta);
 
@@ -70,7 +87,8 @@ namespace CentroMedico.Infrastructure.Repositories
             IGV = reader.GetDecimal(5),
             Total = reader.GetDecimal(6),
             MetodoPago = Enum.Parse<MetodoPago>(reader.GetString(7).Replace("/", "")),
-            Estado = Enum.Parse<EstadoFactura>(reader.GetString(8))
+            Estado = Enum.Parse<EstadoFactura>(reader.GetString(8)),
+            NombrePaciente = reader.GetString(9)
         };
     }
 }

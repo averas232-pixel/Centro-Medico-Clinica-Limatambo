@@ -9,6 +9,7 @@ namespace CentroMedico.Domain.Entities
     {
         public int FacturaID { get; set; }
         public int CitaID { get; set; }
+        public string NombrePaciente { get; set; } = string.Empty;
         public string Serie { get; set; }
         public string Correlativo { get; set; }
         public decimal Subtotal { get; set; }

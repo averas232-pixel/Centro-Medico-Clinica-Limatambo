@@ -41,6 +41,8 @@ namespace Centro_Medico_UI
             services.AddScoped<ICitaService, CitaService>();
             services.AddScoped<IPacienteService, PacienteService>();
             services.AddScoped<IInsumoService, InsumoService>();
+            services.AddScoped<IHistorialService, HistorialService>();
+            services.AddScoped<IFacturaService, FacturaService>();
 
             // Ventanas
             services.AddTransient<MainWindow>();
