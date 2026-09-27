@@ -79,8 +79,8 @@
                           Style="{StaticResource ModernDataGrid}">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="HORA" Binding="{Binding FechaHora, StringFormat={}{0:HH:mm}}" Width="80"/>
-                        <DataGridTextColumn Header="PACIENTE ID" Binding="{Binding PacienteID}" Width="120"/>
-                        <DataGridTextColumn Header="MÉDICO ID" Binding="{Binding MedicoID}" Width="120"/>
+                        <DataGridTextColumn Header="PACIENTE" Binding="{Binding NombrePaciente}" Width="*" MinWidth="180"/>
+                        <DataGridTextColumn Header="MÉDICO" Binding="{Binding NombreMedico}" Width="*" MinWidth="180"/>
                         <DataGridTextColumn Header="MOTIVO" Binding="{Binding Motivo}" Width="*"/>
                         <DataGridTextColumn Header="ESTADO" Binding="{Binding Estado}" Width="120"/>
                     </DataGrid.Columns>
