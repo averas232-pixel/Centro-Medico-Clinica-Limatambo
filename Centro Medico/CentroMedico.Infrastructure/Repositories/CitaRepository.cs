@@ -9,11 +9,18 @@ namespace CentroMedico.Infrastructure.Repositories
 {
     public class CitaRepository : ICitaRepository
     {
+        private const string ConsultaCitas =
+            "SELECT c.CitaID, c.PacienteID, c.MedicoID, c.FechaHora, c.Estado, c.Motivo, " +
+            "LTRIM(RTRIM(CONCAT(p.Nombres, ' ', p.Apellidos))) AS NombrePaciente, " +
+            "LTRIM(RTRIM(CONCAT(m.Nombres, ' ', m.Apellidos))) AS NombreMedico " +
+            "FROM Citas c " +
+            "LEFT JOIN Pacientes p ON p.PacienteID = c.PacienteID " +
+            "LEFT JOIN Medicos m ON m.MedicoID = c.MedicoID ";
+
         public Cita ObtenerPorId(int id)
         {
             using var conn = (SqlConnection)SqlConnectionFactory.CrearConexion();
-            using var cmd = new SqlCommand(
-                "SELECT CitaID, PacienteID, MedicoID, FechaHora, Estado, Motivo FROM Citas WHERE CitaID = @id", conn);
+            using var cmd = new SqlCommand(ConsultaCitas + "WHERE c.CitaID = @id", conn);
             cmd.Parameters.AddWithValue("@id", id);
 
             using var reader = cmd.ExecuteReader();
@@ -25,8 +32,7 @@ namespace CentroMedico.Infrastructure.Repositories
             var lista = new List<Cita>();
             using var conn = (SqlConnection)SqlConnectionFactory.CrearConexion();
             using var cmd = new SqlCommand(
-                "SELECT CitaID, PacienteID, MedicoID, FechaHora, Estado, Motivo FROM Citas " +
-                "WHERE CAST(FechaHora AS DATE) = @fecha ORDER BY FechaHora", conn);
+                ConsultaCitas + "WHERE CAST(c.FechaHora AS DATE) = @fecha ORDER BY c.FechaHora", conn);
             cmd.Parameters.AddWithValue("@fecha", fecha.Date);
 
             using var reader = cmd.ExecuteReader();
@@ -40,8 +46,7 @@ namespace CentroMedico.Infrastructure.Repositories
         {
             var lista = new List<Cita>();
             using var conn = (SqlConnection)SqlConnectionFactory.CrearConexion();
-            using var cmd = new SqlCommand(
-                "SELECT CitaID, PacienteID, MedicoID, FechaHora, Estado, Motivo FROM Citas ORDER BY FechaHora DESC", conn);
+            using var cmd = new SqlCommand(ConsultaCitas + "ORDER BY c.FechaHora DESC", conn);
 
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -73,7 +78,9 @@ namespace CentroMedico.Infrastructure.Repositories
             MedicoID = reader.GetInt32(reader.GetOrdinal("MedicoID")),
             FechaHora = reader.GetDateTime(reader.GetOrdinal("FechaHora")),
             Estado = Enum.Parse<EstadoCita>(reader.GetString(reader.GetOrdinal("Estado"))),
-            Motivo = reader.GetString(reader.GetOrdinal("Motivo"))
+            Motivo = reader.GetString(reader.GetOrdinal("Motivo")),
+            NombrePaciente = reader.IsDBNull(reader.GetOrdinal("NombrePaciente")) ? string.Empty : reader.GetString(reader.GetOrdinal("NombrePaciente")),
+            NombreMedico = reader.IsDBNull(reader.GetOrdinal("NombreMedico")) ? string.Empty : reader.GetString(reader.GetOrdinal("NombreMedico"))
         };
     }
 }
