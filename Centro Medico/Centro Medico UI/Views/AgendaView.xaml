@@ -15,15 +15,25 @@
 
         <Border Grid.Row="0" Background="White" Padding="24,16"
                 BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Image Source="/Assets/Images/logo_limatambo.png" Height="36" Stretch="Uniform" Margin="0,0,10,0"/>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="CLINICA LIMATAMBO" FontSize="16" FontWeight="Bold"
-                               Foreground="{StaticResource TextPrimaryBrush}" LineHeight="18"/>
-                    <TextBlock Text="Sistema de Gestión" FontSize="10"
-                               Foreground="{StaticResource TextSecondaryBrush}"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <Image Source="/Assets/Images/logo_limatambo.png" Height="36" Stretch="Uniform" Margin="0,0,10,0"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="CLINICA LIMATAMBO" FontSize="16" FontWeight="Bold"
+                                   Foreground="{StaticResource TextPrimaryBrush}" LineHeight="18"/>
+                        <TextBlock Text="Sistema de Gestión" FontSize="10"
+                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                    </StackPanel>
                 </StackPanel>
-            </StackPanel>
+                <Button Grid.Column="1" x:Name="BtnNuevaCita" Click="NuevaCita_Click" Content="+ NUEVA CITA"
+                        Style="{StaticResource PrimaryButton}"
+                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                        AutomationProperties.Name="Nueva cita"/>
+            </Grid>
         </Border>
 
         <Grid Grid.Row="1" Height="140" ClipToBounds="True">

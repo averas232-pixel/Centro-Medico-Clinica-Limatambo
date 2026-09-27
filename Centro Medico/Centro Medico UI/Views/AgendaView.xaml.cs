@@ -17,8 +17,31 @@ namespace Centro_Medico_UI.Views
     /// </summary>
     public partial class AgendaView : UserControl   
     {
+        private void NuevaCita_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is not Centro_Medico_UI.ViewModels.AgendaViewModel agenda) return;
+            using var scope = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.CreateScope(App.ServiceProvider);
+            var provider = scope.ServiceProvider;
+            var dialog = new NuevaCitaWindow(
+                Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<CentroMedico.Application.Services.IPacienteService>(provider),
+                Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<CentroMedico.Domain.Interfaces.IMedicoRepository>(provider),
+                Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<CentroMedico.Application.Services.ICitaService>(provider),
+                agenda.FechaSeleccionada)
+            { Owner = Window.GetWindow(this) };
+            if (dialog.ShowDialog() == true)
+            {
+                if (agenda.FechaSeleccionada.Date == dialog.FechaRegistrada.Date)
+                    agenda.CargarAgendaCommand.Execute(null);
+                else
+                    agenda.FechaSeleccionada = dialog.FechaRegistrada.Date;
+                MessageBox.Show(Window.GetWindow(this), "Cita registrada correctamente.", "Nueva cita",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
         public AgendaView()
         {
+            InitializeComponent();
         }
     }
 }
