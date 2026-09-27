@@ -17,6 +17,8 @@ namespace Centro_Medico_UI
         {
             InitializeComponent();
             NavAgenda.IsChecked = true;
+            UsuarioNombreText.Text = App.UsuarioActual?.NombreCompleto ?? "Usuario";
+            UsuarioRolText.Text = App.UsuarioActual?.Rol ?? "";
         }
 
         private void NavAgenda_Checked(object sender, RoutedEventArgs e)

@@ -72,8 +72,8 @@
 
                     <Border DockPanel.Dock="Bottom" BorderBrush="#33FFFFFF" BorderThickness="0,1,0,0" Padding="18,16">
                         <StackPanel>
-                            <TextBlock Text="Sistema de Gestión" FontSize="13" FontWeight="Bold" Foreground="White"/>
-                            <TextBlock Text="Centro Médico" FontSize="11" Foreground="#B0A0A0"/>
+                            <TextBlock x:Name="UsuarioNombreText" FontSize="13" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock x:Name="UsuarioRolText" FontSize="11" Foreground="#B0A0A0"/>
                         </StackPanel>
                     </Border>
 
