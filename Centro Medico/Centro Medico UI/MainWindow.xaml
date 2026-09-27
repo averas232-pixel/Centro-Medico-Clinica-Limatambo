@@ -20,6 +20,7 @@
             </Border.Effect>
             <Grid>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    
                     <Image Source="/Assets/Images/logo_limatambo.png" Height="44" Stretch="Uniform"/>
                     <StackPanel VerticalAlignment="Center" Margin="14,0,0,0">
                         <TextBlock Text="CLÍNICA LIMATAMBO" FontSize="17" FontWeight="Bold"

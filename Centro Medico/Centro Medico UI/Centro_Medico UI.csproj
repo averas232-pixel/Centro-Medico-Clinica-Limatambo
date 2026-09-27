@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <None Remove="Assets\Images\banner_clinica_LimaTambo.jpg" />
+    <None Remove="Assets\Images\logo_limatambo.png" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,6 +26,7 @@
 
   <ItemGroup>
     <Resource Include="Assets\Images\banner_clinica_LimaTambo.jpg" />
+    <Resource Include="Assets\Images\logo_limatambo.png" />
   </ItemGroup>
 
 </Project>
