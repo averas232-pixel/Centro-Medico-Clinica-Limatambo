@@ -16,20 +16,20 @@ namespace CentroMedico.Infrastructure.Repositories
 
             try
             {
-                //Registrar el historial clínico
+                // Registrar el historial clínico
                 int historialId = InsertarHistorial(conn, transaction, datos);
 
-                //Generar la receta
+                // Generar la receta
                 int recetaId = InsertarReceta(conn, transaction, historialId, datos.IndicacionesReceta);
 
-                //Por cada insumo recetado: validar stock, descontar y dejar rastro en el kardex
+                // Por cada insumo recetado: validar stock, descontar y dejar rastro en el kardex
                 decimal totalInsumos = 0m;
                 foreach (var item in datos.InsumosRecetados)
                 {
                     totalInsumos += ProcesarInsumo(conn, transaction, recetaId, item);
                 }
 
-                //Calcular montos y emitir la factura
+                // Calcular montos y emitir la factura
                 decimal subtotal = datos.MontoConsulta + totalInsumos;
                 decimal igv = Math.Round(subtotal * 0.18m, 2);
                 decimal total = subtotal + igv;
@@ -56,9 +56,44 @@ namespace CentroMedico.Infrastructure.Repositories
                     Total = total
                 };
             }
+            catch (SqlException sqlEx)
+            {
+                // Revertir todos los cambios en la base de datos
+                transaction.Rollback();
+
+                string mensajeUsuario = "Ocurrió un fallo en la base de datos al procesar la solicitud.";
+
+                // Violación de clave única (UNIQUE / PRIMARY KEY) - p. ej., cita ya procesada o historial duplicado
+                if (sqlEx.Number == 2627 || sqlEx.Number == 2601)
+                {
+                    mensajeUsuario = "La cita seleccionada ya cuenta con un historial clínico o ya fue atendida previamente.";
+                }
+                // Violación de clave foránea (FOREIGN KEY)
+                else if (sqlEx.Number == 547)
+                {
+                    mensajeUsuario = "Uno de los datos o insumos seleccionados no existe o no es válido.";
+                }
+
+                return new ResultadoCierreConsulta
+                {
+                    Exitoso = false,
+                    MensajeError = mensajeUsuario
+                };
+            }
+            catch (InvalidOperationException invEx)
+            {
+                // Captura excepciones de negocio lanzadas manualmente (ej. Stock insuficiente)
+                transaction.Rollback();
+
+                return new ResultadoCierreConsulta
+                {
+                    Exitoso = false,
+                    MensajeError = invEx.Message
+                };
+            }
             catch (Exception ex)
             {
-                // Si algo falló en cualquier paso, se deshace TODO: nada de historial,
+                // Captura cualquier otro tipo de error inesperado
                 transaction.Rollback();
 
                 return new ResultadoCierreConsulta
@@ -94,7 +129,6 @@ namespace CentroMedico.Infrastructure.Repositories
 
         private decimal ProcesarInsumo(SqlConnection conn, SqlTransaction tx, int recetaId, ItemInsumoDto item)
         {
-            // Bloquea la fila del insumo hasta el commit/rollback (evita que dos consultas
             using var cmdStock = new SqlCommand(
                 "SELECT Stock, PrecioUnitario FROM Insumos WITH (UPDLOCK, ROWLOCK) WHERE InsumoID = @id",
                 conn, tx);
@@ -105,18 +139,17 @@ namespace CentroMedico.Infrastructure.Repositories
             using (var reader = cmdStock.ExecuteReader())
             {
                 if (!reader.Read())
-                    throw new InvalidOperationException($"El insumo #{item.InsumoID} no existe.");
+                    throw new InvalidOperationException($"El insumo seleccionado no se encuentra registrado en el sistema.");
                 stockActual = reader.GetInt32(0);
                 precioUnitario = reader.GetDecimal(1);
             }
 
             if (stockActual < item.Cantidad)
                 throw new InvalidOperationException(
-                    $"Stock insuficiente para el insumo #{item.InsumoID}: disponible {stockActual}, solicitado {item.Cantidad}.");
+                    $"Stock insuficiente para el insumo solicitado (Disponible: {stockActual}, Solicitado: {item.Cantidad}).");
 
             int stockNuevo = stockActual - item.Cantidad;
 
-            // Línea de la receta
             using var cmdDetalle = new SqlCommand(
                 "INSERT INTO DetalleReceta (RecetaID, InsumoID, Cantidad, Dosis) " +
                 "VALUES (@recId, @insId, @cant, @dosis); SELECT CAST(SCOPE_IDENTITY() AS INT);",
@@ -127,7 +160,6 @@ namespace CentroMedico.Infrastructure.Repositories
             cmdDetalle.Parameters.AddWithValue("@dosis", item.Dosis ?? "Según indicación médica");
             int detalleId = (int)cmdDetalle.ExecuteScalar();
 
-            // Kardex: deja rastro del descuento
             using var cmdMov = new SqlCommand(
                 "INSERT INTO MovimientosInsumo (InsumoID, TipoMovimiento, Cantidad, StockAnterior, StockNuevo, " +
                 "Motivo, ReferenciaDetalleRecetaID, FechaMovimiento) " +
@@ -141,7 +173,6 @@ namespace CentroMedico.Infrastructure.Repositories
             cmdMov.Parameters.AddWithValue("@detId", detalleId);
             cmdMov.ExecuteNonQuery();
 
-            // Descuenta el stock
             using var cmdUpdate = new SqlCommand(
                 "UPDATE Insumos SET Stock = @nuevo WHERE InsumoID = @id", conn, tx);
             cmdUpdate.Parameters.AddWithValue("@nuevo", stockNuevo);
