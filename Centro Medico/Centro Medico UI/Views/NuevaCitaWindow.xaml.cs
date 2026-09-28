@@ -56,6 +56,18 @@ namespace Centro_Medico_UI.Views
             }
         }
 
+        private void NuevoPaciente_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new NuevoPacienteWindow { Owner = this };
+            if (dialog.ShowDialog() == true && dialog.PacienteCreado != null)
+            {
+                var pacientes = _pacientes.ObtenerTodos()
+                    .Where(p => p.Activo).OrderBy(p => p.Apellidos).ThenBy(p => p.Nombres).ToList();
+                PacienteCombo.ItemsSource = pacientes;
+                PacienteCombo.SelectedItem = pacientes.FirstOrDefault(p => p.PacienteID == dialog.PacienteCreado.PacienteID);
+            }
+        }
+
         private void Error(string mensaje, Control campo)
         {
             EstadoText.Text = mensaje;
@@ -83,8 +95,10 @@ namespace Centro_Medico_UI.Views
 
             var datos = new NuevaCitaDto
             {
-                PacienteID = paciente.PacienteID, MedicoID = medico.MedicoID,
-                FechaHora = fechaHora, Motivo = MotivoText.Text.Trim()
+                PacienteID = paciente.PacienteID,
+                MedicoID = medico.MedicoID,
+                FechaHora = fechaHora,
+                Motivo = MotivoText.Text.Trim()
             };
             _guardando = true;
             Formulario.IsEnabled = GuardarButton.IsEnabled = CancelarButton.IsEnabled = false;

@@ -36,7 +36,7 @@ namespace Centro_Medico_UI.ViewModels
             CargarFacturas();
         }
 
-        private void CargarFacturas()
+        public void CargarFacturas()
         {
             Facturas.Clear();
             var lista = _facturaService.ObtenerTodas();
@@ -47,4 +47,4 @@ namespace Centro_Medico_UI.ViewModels
             OnPropertyChanged(nameof(CantidadAnuladas));
         }
     }
-}               
+}

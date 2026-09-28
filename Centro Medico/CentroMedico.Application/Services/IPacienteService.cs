@@ -7,5 +7,6 @@ namespace CentroMedico.Application.Services
     {
         List<Paciente> ObtenerTodos();
         Paciente ObtenerPorId(int id);
+        int RegistrarPaciente(Paciente paciente);
     }
 }
