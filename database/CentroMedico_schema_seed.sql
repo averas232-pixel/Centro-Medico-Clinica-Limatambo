@@ -148,6 +148,23 @@ CREATE TABLE DetalleFactura (
     CONSTRAINT FK_DetalleFactura_Factura FOREIGN KEY (FacturaID) REFERENCES Facturas(FacturaID)
 );
 GO
+   
+CREATE TABLE Usuarios (
+    UsuarioID INT IDENTITY(1,1) PRIMARY KEY,
+    NombreUsuario VARCHAR(50) NOT NULL UNIQUE,
+    PasswordHash CHAR(64) NOT NULL,
+    Salt VARCHAR(32) NOT NULL,
+    NombreCompleto VARCHAR(100) NOT NULL,
+    Rol VARCHAR(30) NOT NULL,
+    Activo BIT NOT NULL DEFAULT 1,
+    FechaCreacion DATETIME NOT NULL DEFAULT GETDATE()
+);
+GO
+
+INSERT INTO Usuarios (NombreUsuario, PasswordHash, Salt, NombreCompleto, Rol) VALUES
+('admin', 'ccc9a3b080075a0f71dffc782492e7fce998fceb152635a445a35d4d2c8bb6ec', 'b4365c6436dd2f0c', 'Administrador del Sistema', 'Administrador'),
+('doctor', 'ba978a7345aca5733f847cf26aee1b3bae8be76e1e6d933f764b915ae01d3a57', 'abcbaf2ec22f2822', 'Dr. Antony Vera', 'Medico');
+GO
 
 -- ============================================================
 -- 2. DATOS DE PRUEBA (SEED DATA) - mínimo 30 filas por tabla
